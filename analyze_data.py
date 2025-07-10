@@ -1,4 +1,5 @@
-# analyze_data.py - 支持 n-gram（复合词）词频统计完整智能分析版
+# analyze_data.py - 自动检索当前文件夹及子文件夹中最新 CSV 文件，支持 n-gram 分析
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
@@ -6,7 +7,6 @@ import glob
 from wordcloud import WordCloud
 from sklearn.feature_extraction.text import CountVectorizer
 
-# 加载外部停用词
 with open("research_stop_words.txt") as f:
     stop_words = set(line.strip() for line in f if line.strip())
 
@@ -14,7 +14,7 @@ figures_root = "figures"
 os.makedirs(figures_root, exist_ok=True)
 
 def get_latest_csv():
-    files = sorted(glob.glob("data/result_*.csv"), key=os.path.getmtime, reverse=True)
+    files = sorted(glob.glob("**/*.csv", recursive=True), key=os.path.getmtime, reverse=True)
     return files[0] if files else None
 
 def smart_column_mapping(df):
@@ -80,6 +80,7 @@ def analyze_csv(file_path):
 if __name__ == "__main__":
     file = get_latest_csv()
     if file:
+        print(f"🔍 Detected latest CSV: {file}")
         analyze_csv(file)
     else:
-        print("❌ No CSV found in data/")
+        print("❌ No CSV found in current folder or subfolders.")

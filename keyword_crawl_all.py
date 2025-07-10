@@ -1,4 +1,4 @@
-# keyword_crawl_all.py - 单站点合并存储版，实现同一站点分页抓取数据整合到同一个 CSV
+# keyword_crawl_all.py - 单站点合并存储版，限制单次抓取上限 2000 条
 
 import pandas as pd
 import os
@@ -30,8 +30,13 @@ for idx, row in sites_df.iterrows():
     max_empty_pages = 3
     empty_pages = 0
     all_data = []
+    max_records = 2000  # 抓取上限
 
     while True:
+        if len(all_data) >= max_records:
+            print(f"✅ 已抓取到上限 {max_records} 条，停止 {site_name} 抓取。")
+            break
+
         url = search_template.format(keyword=keyword_encoded, page=page, start=start, cursor=cursor)
         print(f"🌐 正在抓取: {url}")
 
@@ -54,7 +59,6 @@ for idx, row in sites_df.iterrows():
                 print(f"⚠️ 本页无数据。")
                 empty_pages += 1
 
-        # 分页推进
         page += 1
         start += 50
 
