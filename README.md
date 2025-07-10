@@ -52,7 +52,3 @@ python analyze_data.py
 - [ ] 集成可选的自动报告生成 (Markdown/PDF)
 - [ ] 可选邮件/Telegram 报告推送
 - [ ] 支持更多公开科研网站与 API 模块 (Europe PMC, OpenAlex 等)
-
----
-
-如需继续集成批量可视化、自动报告和跨站点热点词比较分析，请随时告知以继续完善你的科研工作流。
