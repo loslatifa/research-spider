@@ -6,8 +6,8 @@ import os
 
 if __name__ == "__main__":
     print("\n🚀 Research Spider Framework: Universal Crawler with robots.txt check")
-    #url = input("Enter the URL to crawl (e.g., https://example.com): ").strip()
-    url = 'http://quotes.toscrape.com/'
+    url = input("Enter the URL to crawl (e.g., https://example.com): ").strip()
+    #url = 'http://quotes.toscrape.com/'
     if not url.startswith("http"):
         url = "https://" + url
 
