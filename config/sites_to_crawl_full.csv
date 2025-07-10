@@ -1,0 +1,5 @@
+site_name,base_url,search_template,parser,enable
+arxiv,https://arxiv.org/,https://arxiv.org/search/?query={keyword}&searchtype=all&abstracts=show&order=-announced_date_first&size=50&start={start},parse_arxiv_search_page,1
+pubmed,https://pubmed.ncbi.nlm.nih.gov/,https://pubmed.ncbi.nlm.nih.gov/?term={keyword}&page={page},parse_pubmed_search_page,1
+openalex,https://api.openalex.org/works,https://api.openalex.org/works?filter=title.search:{keyword}&per-page=50&cursor={cursor},parse_openalex_json,1
+ieee,https://ieeexplore.ieee.org/,https://ieeexplore.ieee.org/search/searchresult.jsp?queryText={keyword}&pageNumber={page},parse_ieee_search_page,1

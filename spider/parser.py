@@ -105,3 +105,28 @@ def parse_ieee_page(html, url=None):
         }
         records.append(record)
     return records
+
+def parse_openalex_json(json_data, url=None):
+    records = []
+    for item in json_data.get('results', []):
+        title = item.get('title', '')
+        publication_date = item.get('publication_date', '')
+        doi = item.get('doi', '')
+        authors = ', '.join([auth['author']['display_name'] for auth in item.get('authorships', [])])
+        citation_count = item.get('cited_by_count', 0)
+        primary_location = item.get('primary_location') or {}
+        source = primary_location.get('source') or {}
+        oa_url = source.get('url', '')
+
+        record = {
+            'source_url': url if url else '',
+            'title': title,
+            'authors': authors,
+            'publication_date': publication_date,
+            'doi': doi,
+            'citation_count': citation_count,
+            'openalex_url': oa_url
+        }
+        records.append(record)
+
+    return records

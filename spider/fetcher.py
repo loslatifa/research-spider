@@ -28,7 +28,7 @@ def fetch_url(url, proxies=None, retries=3, timeout=15):
                 return res.text
             else:
                 print(f"⚠️ Status {res.status_code} on {url}, retrying...")
-                time.sleep(random.uniform(3, 7))
+                time.sleep(random.uniform(0.5,1))
         except Exception as e:
             print(f"⚠️ Exception on {url}: {e}, retrying...")
             time.sleep(random.uniform(5, 10))

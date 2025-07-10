@@ -9,7 +9,7 @@ log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "spider_log.txt")
 
-def random_sleep(min_seconds=2, max_seconds=5):
+def random_sleep(min_seconds=0.5, max_seconds=1.5):
     duration = random.uniform(min_seconds, max_seconds)
     print(f"💤 Sleeping for {duration:.2f} seconds...")
     time.sleep(duration)

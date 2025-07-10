@@ -3,3 +3,4 @@ arxiv,https://arxiv.org/list/cs.LG/recent,parse_arxiv_page,1
 pubmed,https://pubmed.ncbi.nlm.nih.gov/?term=machine+learning,parse_pubmed_page,1
 doaj,https://doaj.org/search/articles?ref=homepage&q=artificial+intelligence,parse_doaj_page,1
 ieee,https://ieeexplore.ieee.org/search/searchresult.jsp?queryText=deep%20learning,parse_ieee_page,1
+openalex,https://api.openalex.org/works?filter=title.search:machine%20learning,parse_openalex_json,1
