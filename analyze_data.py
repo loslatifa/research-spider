@@ -1,4 +1,4 @@
-# analyze_data.py - 自动检索当前文件夹及子文件夹中最新 CSV 文件，支持 n-gram 分析
+# analyze_data.py - 支持 n-gram（复合词）词频统计完整智能分析版（唯一图像目录版本）
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,15 +7,15 @@ import glob
 from wordcloud import WordCloud
 from sklearn.feature_extraction.text import CountVectorizer
 
+# 加载外部停用词
 with open("research_stop_words.txt") as f:
     stop_words = set(line.strip() for line in f if line.strip())
 
 figures_root = "figures"
 os.makedirs(figures_root, exist_ok=True)
 
-def get_latest_csv():
-    files = sorted(glob.glob("data/**/*.csv", recursive=True), key=os.path.getmtime, reverse=True)
-    return files[0] if files else None
+def get_all_csv_files():
+    return sorted(glob.glob("data/**/*.csv", recursive=True), key=os.path.getmtime, reverse=True)
 
 def smart_column_mapping(df):
     rename_map = {}
@@ -37,10 +37,16 @@ def extract_ngrams_frequency(texts, ngram_range=(2, 3), top_k=30):
 
 def analyze_csv(file_path):
     df = pd.read_csv(file_path)
-    filename = os.path.basename(file_path)
+    filename = os.path.basename(file_path).replace(".csv", "")
     domain = filename.split("_")[1] if "_" in filename else "general"
-    fig_path = os.path.join(figures_root, domain)
+    fig_path = os.path.join(figures_root, domain, filename)
     os.makedirs(fig_path, exist_ok=True)
+
+    # 如果已存在分析结果则跳过
+    already_done = os.path.exists(os.path.join(fig_path, "ngram_wordcloud.png"))
+    if already_done:
+        print(f"⚠️ {filename} 已分析，跳过。")
+        return
 
     df = smart_column_mapping(df)
     
@@ -49,7 +55,7 @@ def analyze_csv(file_path):
     combined_text = texts + tags
 
     if not combined_text:
-        print("❌ No text data found for analysis.")
+        print(f"❌ {filename} 中无可分析文本。")
         return
 
     ngram_freq = extract_ngrams_frequency(combined_text, ngram_range=(2, 3), top_k=30)
@@ -73,29 +79,14 @@ def analyze_csv(file_path):
         ngram_df = pd.DataFrame(ngram_freq, columns=['ngram', 'count'])
         ngram_df.to_csv(os.path.join(fig_path, "ngram_frequency_table.csv"), index=False)
 
-        print(f"✅ N-gram figures and frequency table saved under {fig_path}")
+        print(f"✅ 分析完成: {filename}，结果保存至 {fig_path}")
     else:
-        print("⚠️ No valid n-grams found for visualization.")
+        print(f"⚠️ 未生成有效的 n-gram: {filename}")
 
 if __name__ == "__main__":
-    csv_files = sorted(glob.glob("data/**/*.csv", recursive=True))
-    analyzed = 0
-    skipped = 0
-
-    for csv_file in csv_files:
-        filename = os.path.basename(csv_file)
-        domain = filename.split("_")[0] if "_" in filename else "general"
-        fig_path = os.path.join(figures_root, domain)
-
-        # 检查是否已有图像（即已分析）
-        wordcloud_path = os.path.join(fig_path, "ngram_wordcloud.png")
-        if os.path.exists(wordcloud_path):
-            print(f"⏭️ 已存在分析图像，跳过：{filename}")
-            skipped += 1
-            continue
-
-        print(f"\n📊 正在分析：{filename}")
-        analyze_csv(csv_file)
-        analyzed += 1
-
-    print(f"\n✅ 共分析新文件 {analyzed} 个，跳过已存在图像的 {skipped} 个。")
+    files = get_all_csv_files()
+    if not files:
+        print("❌ data 文件夹中无 CSV 文件。")
+    else:
+        for file in files:
+            analyze_csv(file)
