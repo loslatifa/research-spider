@@ -14,7 +14,7 @@ figures_root = "figures"
 os.makedirs(figures_root, exist_ok=True)
 
 def get_latest_csv():
-    files = sorted(glob.glob("**/*.csv", recursive=True), key=os.path.getmtime, reverse=True)
+    files = sorted(glob.glob("data/**/*.csv", recursive=True), key=os.path.getmtime, reverse=True)
     return files[0] if files else None
 
 def smart_column_mapping(df):
@@ -78,9 +78,24 @@ def analyze_csv(file_path):
         print("⚠️ No valid n-grams found for visualization.")
 
 if __name__ == "__main__":
-    file = get_latest_csv()
-    if file:
-        print(f"🔍 Detected latest CSV: {file}")
-        analyze_csv(file)
-    else:
-        print("❌ No CSV found in current folder or subfolders.")
+    csv_files = sorted(glob.glob("data/**/*.csv", recursive=True))
+    analyzed = 0
+    skipped = 0
+
+    for csv_file in csv_files:
+        filename = os.path.basename(csv_file)
+        domain = filename.split("_")[0] if "_" in filename else "general"
+        fig_path = os.path.join(figures_root, domain)
+
+        # 检查是否已有图像（即已分析）
+        wordcloud_path = os.path.join(fig_path, "ngram_wordcloud.png")
+        if os.path.exists(wordcloud_path):
+            print(f"⏭️ 已存在分析图像，跳过：{filename}")
+            skipped += 1
+            continue
+
+        print(f"\n📊 正在分析：{filename}")
+        analyze_csv(csv_file)
+        analyzed += 1
+
+    print(f"\n✅ 共分析新文件 {analyzed} 个，跳过已存在图像的 {skipped} 个。")

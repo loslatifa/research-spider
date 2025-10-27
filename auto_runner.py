@@ -23,7 +23,7 @@ if __name__ == "__main__":
     while True:
         now = datetime.now()
         # 每天凌晨 03:00 自动执行
-        if now.hour == 3 and now.minute == 0:
+        if now.hour == 19 and now.minute == 0:
             run_crawl_task()
             print("✅ All sites crawled, sleeping until next day.")
             time.sleep(60)  # 防抖，避免一分钟内重复执行
