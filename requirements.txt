@@ -3,3 +3,5 @@ pandas
 beautifulsoup4
 matplotlib
 wordcloud
+scikit-learn
+schedule
