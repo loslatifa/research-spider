@@ -1,0 +1,6 @@
+{
+  "topics": ["机器学习", "大语言模型", "计算机视觉"],
+  "keywords": ["agent", "diffusion", "benchmark"],
+  "sources": ["arxiv.org", "api.openalex.org"],
+  "cooldown_hours": 24
+}

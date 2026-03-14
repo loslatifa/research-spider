@@ -1,5 +1,9 @@
 # parser.py - 完整包含 quotes、arxiv、pubmed、doaj、ieee 解析模块，可直接用于 research-spider
+from urllib.parse import urljoin
+
 from bs4 import BeautifulSoup
+
+from storage.schema import reconstruct_openalex_abstract
 
 def parse_quotes_page(html, url=None):
     soup = BeautifulSoup(html, 'html.parser')
@@ -29,7 +33,7 @@ def parse_arxiv_page(html, url=None):
         abs_link_tag = dt.find('a', title='Abstract')
         if not abs_link_tag:
             continue
-        abs_url = "https://arxiv.org" + abs_link_tag.get('href')
+        abs_url = urljoin("https://arxiv.org", abs_link_tag.get('href'))
         pdf_url = abs_url.replace('/abs/', '/pdf/')
         title_tag = dd.find('div', class_='list-title mathjax')
         title = title_tag.get_text(strip=True).replace('Title:', '') if title_tag else ''
@@ -42,6 +46,8 @@ def parse_arxiv_page(html, url=None):
             "source_url": url if url else "",
             "title": title,
             "authors": authors,
+            "abstract": "",
+            "keywords": "",
             "abstract_url": abs_url,
             "pdf_url": pdf_url
         }
@@ -112,20 +118,32 @@ def parse_openalex_json(json_data, url=None):
         title = item.get('title', '')
         publication_date = item.get('publication_date', '')
         doi = item.get('doi', '')
+        publication_year = item.get('publication_year', '')
         authors = ', '.join([auth['author']['display_name'] for auth in item.get('authorships', [])])
         citation_count = item.get('cited_by_count', 0)
         primary_location = item.get('primary_location') or {}
         source = primary_location.get('source') or {}
-        oa_url = source.get('url', '')
+        venue = source.get('display_name', '')
+        landing_page_url = primary_location.get('landing_page_url', '')
+        pdf_url = primary_location.get('pdf_url', '')
+        abstract = reconstruct_openalex_abstract(item.get('abstract_inverted_index') or {})
+        keywords = ', '.join(concept.get('display_name', '') for concept in item.get('concepts', []) if concept.get('display_name'))
 
         record = {
             'source_url': url if url else '',
             'title': title,
             'authors': authors,
+            'venue': venue,
+            'publication_year': publication_year,
             'publication_date': publication_date,
             'doi': doi,
+            'abstract': abstract,
+            'keywords': keywords,
+            'abstract_url': landing_page_url,
+            'pdf_url': pdf_url,
+            'url': item.get('id', '') or landing_page_url,
             'citation_count': citation_count,
-            'openalex_url': oa_url
+            'openalex_url': source.get('url', '')
         }
         records.append(record)
 

@@ -1,0 +1,20 @@
+{
+  "db_path": "data/research_spider.db",
+  "analysis": {
+    "enabled": true,
+    "max_retries": 3,
+    "retry_backoff_seconds": 2,
+    "batch_limit": 50
+  },
+  "recommendation": {
+    "min_priority_score": 60,
+    "per_topic_limit": 2,
+    "cooldown_hours": 24,
+    "max_batch_size": 10
+  },
+  "notification": {
+    "enabled": true,
+    "channels": ["console", "markdown", "json"],
+    "output_dir": "data/notifications"
+  }
+}

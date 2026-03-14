@@ -56,9 +56,9 @@ def smart_column_mapping(df):
                 except Exception:
                     pass
 
-    merge_columns(['quote_text', 'title', 'paragraph', 'text'], 'text')
+    merge_columns(['quote_text', 'title', 'paragraph', 'abstract', 'summary', 'text'], 'text')
     merge_columns(['author', 'authors'], 'authors')
-    merge_columns(['tags', 'keywords', 'category'], 'tags')
+    merge_columns(['tags', 'keywords', 'category', 'topic'], 'tags')
 
     return df
 

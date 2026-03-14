@@ -1,4 +1,5 @@
 # parser_search.py - 搜索页面统一解析器集合
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
@@ -13,15 +14,21 @@ def parse_arxiv_search_page(html, url=None):
         title = result.find('p', class_='title is-5 mathjax').get_text(strip=True)
         authors = result.find('p', class_='authors').get_text(strip=True).replace('Authors:', '').strip()
         abstract_url = result.find('p', class_='list-title is-inline-block').find('a')['href']
+        abstract_tag = result.find('span', class_='abstract-full')
+        abstract = abstract_tag.get_text(' ', strip=True).replace('△ Less', '').strip() if abstract_tag else ''
         pdf_tag = result.find('a', string='pdf')
-        pdf_url = 'https://arxiv.org' + pdf_tag['href'] if pdf_tag else ''
+        pdf_url = urljoin('https://arxiv.org', pdf_tag['href']) if pdf_tag else ''
         date_tag = result.find('p', class_='is-size-7')
         submitted_date = date_tag.get_text(strip=True).replace('Submitted ', '') if date_tag else ''
+        tag_elements = result.find_all('span', class_='tag')
+        keywords = ', '.join(tag.get_text(strip=True) for tag in tag_elements)
 
         records.append({
             'source_url': url if url else '',
             'title': title,
             'authors': authors,
+            'abstract': abstract,
+            'keywords': keywords,
             'abstract_url': abstract_url,
             'pdf_url': pdf_url,
             'submitted_date': submitted_date
