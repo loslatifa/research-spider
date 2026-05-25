@@ -45,7 +45,7 @@ def _freshness_score(record: Dict) -> int:
     return 0
 
 
-def _preference_score(record: Dict, analysis: Dict, preferences: Dict) -> int:
+def _preference_signals(record: Dict, analysis: Dict, preferences: Dict) -> Dict:
     text = ' '.join([
         record.get('title', ''),
         record.get('abstract', ''),
@@ -54,16 +54,54 @@ def _preference_score(record: Dict, analysis: Dict, preferences: Dict) -> int:
         ' '.join(analysis.get('topic_tags', [])),
     ]).lower()
     score = 0
+    matched_keywords = []
+    matched_topics = []
+    matched_sources = []
     for keyword in preferences.get('keywords', []):
         if keyword.lower() in text:
             score += 8
+            matched_keywords.append(keyword)
     for topic in preferences.get('topics', []):
         if topic.lower() in text:
             score += 10
+            matched_topics.append(topic)
     for source in preferences.get('sources', []):
         if source.lower() == record.get('source', '').lower():
             score += 5
-    return min(score, 25)
+            matched_sources.append(source)
+    return {
+        'score': min(score, 25),
+        'matched_keywords': matched_keywords,
+        'matched_topics': matched_topics,
+        'matched_sources': matched_sources,
+    }
+
+
+def _build_recommendation_reasons(
+    record: Dict,
+    analysis: Dict,
+    preference_signals: Dict,
+    components: Dict[str, int],
+) -> List[str]:
+    reasons = []
+    if preference_signals['matched_keywords']:
+        reasons.append('Matched keywords: ' + ', '.join(preference_signals['matched_keywords']))
+    if preference_signals['matched_topics']:
+        reasons.append('Matched topics: ' + ', '.join(preference_signals['matched_topics']))
+    if preference_signals['matched_sources']:
+        reasons.append('Preferred source: ' + ', '.join(preference_signals['matched_sources']))
+    if record.get('change_type') == 'updated':
+        reasons.append('Paper metadata changed since the previous crawl')
+    elif record.get('change_type') == 'new':
+        reasons.append('Newly discovered paper')
+    if components.get('freshness', 0) >= 15:
+        reasons.append('Recent publication or crawl date')
+    if components.get('citation_bonus', 0) > 0:
+        reasons.append(f"Citation signal contributed +{components['citation_bonus']} points")
+    attention_reason = analysis.get('attention_recommendation', {}).get('reason', '')
+    if attention_reason:
+        reasons.append('AI assessment: ' + attention_reason)
+    return reasons
 
 
 def score_record(record: Dict, analysis: Dict, preferences: Dict) -> Dict:
@@ -73,7 +111,15 @@ def score_record(record: Dict, analysis: Dict, preferences: Dict) -> Dict:
     citation_bonus = min(10, citation_count // 20) if citation_count > 0 else 0
     update_bonus = 5 if record.get('change_type') == 'updated' else 0
     freshness = _freshness_score(record)
-    preference = _preference_score(record, analysis, preferences)
+    preference_signals = _preference_signals(record, analysis, preferences)
+    preference = preference_signals['score']
+    components = {
+        'attention_score': attention_score,
+        'citation_bonus': citation_bonus,
+        'update_bonus': update_bonus,
+        'freshness': freshness,
+        'preference': preference,
+    }
     total = min(100, attention_score + citation_bonus + update_bonus + freshness + preference)
 
     return {
@@ -92,6 +138,18 @@ def score_record(record: Dict, analysis: Dict, preferences: Dict) -> Dict:
         'attention_reason': analysis.get('attention_recommendation', {}).get('reason', ''),
         'should_follow': bool(analysis.get('attention_recommendation', {}).get('should_follow')),
         'priority_score': total,
+        'score_components': components,
+        'matched_preferences': {
+            'keywords': preference_signals['matched_keywords'],
+            'topics': preference_signals['matched_topics'],
+            'sources': preference_signals['matched_sources'],
+        },
+        'recommendation_reasons': _build_recommendation_reasons(
+            record,
+            analysis,
+            preference_signals,
+            components,
+        ),
         'topic_key': _extract_topic_key({**record, **analysis}),
     }
 

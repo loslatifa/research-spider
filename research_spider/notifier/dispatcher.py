@@ -27,7 +27,8 @@ class NotificationDispatcher:
         for index, item in enumerate(items, start=1):
             print(f"{index}. [{item['priority_score']}] {item['title']}")
             print(f"   - source={item.get('source', '')} change={item.get('change_type', '')} topic={item.get('topic_key', '')}")
-            print(f"   - reason={item.get('attention_reason', '')}")
+            for reason in item.get('recommendation_reasons', []):
+                print(f"   - reason={reason}")
             if item.get('url'):
                 print(f"   - url={item['url']}")
 
@@ -41,7 +42,17 @@ class NotificationDispatcher:
             lines.append(f"- Change: {item.get('change_type', '')}")
             lines.append(f"- Topic: {item.get('topic_key', '')}")
             lines.append(f"- Summary: {item.get('summary_zh', '')}")
-            lines.append(f"- Reason: {item.get('attention_reason', '')}")
+            reasons = item.get('recommendation_reasons', [])
+            if reasons:
+                lines.append('- Reasons:')
+                for reason in reasons:
+                    lines.append(f"  - {reason}")
+            elif item.get('attention_reason'):
+                lines.append(f"- Reason: {item.get('attention_reason', '')}")
+            components = item.get('score_components', {})
+            if components:
+                component_text = ', '.join(f'{key}={value}' for key, value in components.items())
+                lines.append(f"- Score components: {component_text}")
             if item.get('url'):
                 lines.append(f"- URL: {item['url']}")
             if item.get('pdf_url'):
