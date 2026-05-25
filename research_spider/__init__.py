@@ -1,0 +1,2 @@
+"""Research Spider application package."""
+

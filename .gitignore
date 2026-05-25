@@ -1,0 +1,40 @@
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environments
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Runtime logs
+logs/*.log
+logs/spider_log.txt
+
+# Generated crawl data and local databases
+data/*.csv
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/notifications/*.json
+data/notifications/*.md
+
+# Generated visualizations
+figures/
+
+# Local planning artifacts
+docs/planning/
+codex-progress.txt
+feature_list.json
+
+# OS and editor metadata
+.DS_Store
+.vscode/
+.idea/

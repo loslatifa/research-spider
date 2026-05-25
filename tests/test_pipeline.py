@@ -2,8 +2,8 @@ import json
 
 import pandas as pd
 
-from pipeline.orchestrator import process_delta_file
-from storage.schema import SCHEMA_COLUMNS, normalize_record
+from research_spider.pipeline.orchestrator import process_delta_file
+from research_spider.storage.schema import SCHEMA_COLUMNS, normalize_record
 
 
 def test_process_delta_file_runs_with_fallback_analysis(tmp_path):

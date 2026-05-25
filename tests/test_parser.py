@@ -1,4 +1,4 @@
-from spider import parser_search
+from research_spider.spider import parser_search
 
 
 def test_parse_arxiv_search_page_extracts_structured_fields():

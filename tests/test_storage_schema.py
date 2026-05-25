@@ -1,6 +1,6 @@
 import pandas as pd
 
-from storage.schema import SCHEMA_COLUMNS, normalize_record, prepare_incremental_outputs
+from research_spider.storage.schema import SCHEMA_COLUMNS, normalize_record, prepare_incremental_outputs
 
 
 def test_prepare_incremental_outputs_detects_new_and_updated(tmp_path):
