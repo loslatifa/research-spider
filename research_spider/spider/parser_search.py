@@ -1,7 +1,14 @@
 # parser_search.py - parser collection for search-result pages.
-from urllib.parse import urljoin
+import re
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
+
+
+def _last_url_segment(value: str) -> str:
+    path = urlparse(value or '').path.strip('/')
+    return path.rsplit('/', 1)[-1] if path else ''
+
 
 #########################################
 # arXiv search page.
@@ -14,6 +21,7 @@ def parse_arxiv_search_page(html, url=None):
         title = result.find('p', class_='title is-5 mathjax').get_text(strip=True)
         authors = result.find('p', class_='authors').get_text(strip=True).replace('Authors:', '').strip()
         abstract_url = result.find('p', class_='list-title is-inline-block').find('a')['href']
+        arxiv_id = _last_url_segment(abstract_url)
         abstract_tag = result.find('span', class_='abstract-full')
         abstract = abstract_tag.get_text(' ', strip=True).replace('△ Less', '').strip() if abstract_tag else ''
         pdf_tag = result.find('a', string='pdf')
@@ -29,6 +37,7 @@ def parse_arxiv_search_page(html, url=None):
             'authors': authors,
             'abstract': abstract,
             'keywords': keywords,
+            'arxiv_id': arxiv_id,
             'abstract_url': abstract_url,
             'pdf_url': pdf_url,
             'submitted_date': submitted_date
@@ -46,6 +55,8 @@ def parse_pubmed_search_page(html, url=None):
         title_tag = article.find('a', class_='docsum-title')
         title = title_tag.get_text(strip=True) if title_tag else ''
         abstract_url = 'https://pubmed.ncbi.nlm.nih.gov' + title_tag['href'] if title_tag else ''
+        pmid_match = re.search(r'/(\d+)/?$', abstract_url)
+        pmid = pmid_match.group(1) if pmid_match else ''
         authors_tag = article.find('span', class_='docsum-authors full-authors')
         authors = authors_tag.get_text(strip=True) if authors_tag else ''
         journal_tag = article.find('span', class_='docsum-journal-citation full-journal-citation')
@@ -56,6 +67,7 @@ def parse_pubmed_search_page(html, url=None):
             'title': title,
             'authors': authors,
             'journal_info': journal_info,
+            'pmid': pmid,
             'abstract_url': abstract_url
         })
     return records

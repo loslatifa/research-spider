@@ -1,9 +1,16 @@
 # parser.py - parsers for quotes, arXiv, PubMed, DOAJ, IEEE, and OpenAlex.
-from urllib.parse import urljoin
+import re
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
 from research_spider.storage.schema import reconstruct_openalex_abstract
+
+
+def _last_url_segment(value: str) -> str:
+    path = urlparse(value or '').path.strip('/')
+    return path.rsplit('/', 1)[-1] if path else ''
+
 
 def parse_quotes_page(html, url=None):
     soup = BeautifulSoup(html, 'html.parser')
@@ -34,6 +41,7 @@ def parse_arxiv_page(html, url=None):
         if not abs_link_tag:
             continue
         abs_url = urljoin("https://arxiv.org", abs_link_tag.get('href'))
+        arxiv_id = _last_url_segment(abs_url)
         pdf_url = abs_url.replace('/abs/', '/pdf/')
         title_tag = dd.find('div', class_='list-title mathjax')
         title = title_tag.get_text(strip=True).replace('Title:', '') if title_tag else ''
@@ -48,6 +56,7 @@ def parse_arxiv_page(html, url=None):
             "authors": authors,
             "abstract": "",
             "keywords": "",
+            "arxiv_id": arxiv_id,
             "abstract_url": abs_url,
             "pdf_url": pdf_url
         }
@@ -61,6 +70,8 @@ def parse_pubmed_page(html, url=None):
         title_tag = article.find('a', class_='docsum-title')
         title = title_tag.get_text(strip=True) if title_tag else ''
         href = 'https://pubmed.ncbi.nlm.nih.gov' + title_tag['href'] if title_tag else ''
+        pmid_match = re.search(r'/(\d+)/?$', href)
+        pmid = pmid_match.group(1) if pmid_match else ''
         authors_tag = article.find('span', class_='docsum-authors full-authors')
         authors = authors_tag.get_text(strip=True) if authors_tag else ''
         journal_tag = article.find('span', class_='docsum-journal-citation full-journal-citation')
@@ -70,6 +81,7 @@ def parse_pubmed_page(html, url=None):
             'title': title,
             'authors': authors,
             'journal': journal,
+            'pmid': pmid,
             'url': href
         }
         records.append(record)
@@ -116,6 +128,7 @@ def parse_openalex_json(json_data, url=None):
     records = []
     for item in json_data.get('results', []):
         title = item.get('title', '')
+        openalex_id = item.get('id', '')
         publication_date = item.get('publication_date', '')
         doi = item.get('doi', '')
         publication_year = item.get('publication_year', '')
@@ -137,11 +150,12 @@ def parse_openalex_json(json_data, url=None):
             'publication_year': publication_year,
             'publication_date': publication_date,
             'doi': doi,
+            'openalex_id': openalex_id,
             'abstract': abstract,
             'keywords': keywords,
             'abstract_url': landing_page_url,
             'pdf_url': pdf_url,
-            'url': item.get('id', '') or landing_page_url,
+            'url': openalex_id or landing_page_url,
             'citation_count': citation_count,
             'openalex_url': source.get('url', '')
         }

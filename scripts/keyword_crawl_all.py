@@ -20,7 +20,12 @@ import requests
 
 from research_spider.spider import fetcher
 from research_spider.spider import parser, parser_search
-from research_spider.storage.schema import SCHEMA_COLUMNS, normalize_record, prepare_incremental_outputs
+from research_spider.storage.schema import (
+    SCHEMA_COLUMNS,
+    normalize_record,
+    prepare_incremental_outputs,
+    summarize_field_completeness,
+)
 
 os.makedirs("data", exist_ok=True)
 
@@ -125,6 +130,7 @@ def main():
 
         normalized_rows = [normalize_record(r, base_url=base_for_source, crawled_at_iso=crawled_at_iso, query=keyword) for r in raw_data]
         df_new = pd.DataFrame(normalized_rows, columns=SCHEMA_COLUMNS).drop_duplicates(subset=["uid"])
+        completeness = summarize_field_completeness(df_new)
 
         master_path = os.path.join("data", f"master_{domain_key}.csv")
         df_delta, df_master, stats = prepare_incremental_outputs(df_new, master_path)
@@ -139,6 +145,9 @@ def main():
         print(f"   - 更新：{stats['updated']} 条")
         print(f"   - 本次变更（delta）：{len(df_delta)} 条 -> {delta_path}")
         print(f"   - 累计 master：{len(df_master)} 条 -> {master_path}")
+        print("   - 字段完整度：")
+        for field, field_stats in completeness.items():
+            print(f"     - {field}: {field_stats['present']}/{field_stats['total']} ({field_stats['rate']:.0%})")
 
         # Run visualization on the current delta file.
         try:

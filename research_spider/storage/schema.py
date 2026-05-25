@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 import re
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -27,6 +27,8 @@ SCHEMA_COLUMNS = [
     'change_type',
     'extra',
 ]
+
+DEFAULT_COMPLETENESS_FIELDS = ['title', 'authors', 'url', 'abstract', 'doi']
 
 _HASH_FIELDS = [
     'uid',
@@ -100,10 +102,36 @@ def reconstruct_openalex_abstract(inverted_index: Dict[str, List[int]]) -> str:
     return ' '.join(token for _, token in sorted(positions.items()))
 
 
-def _make_uid(doi: Any, title: Any, authors: Any, year: Any) -> str:
+def _norm_source_uid(record: Dict[str, Any]) -> str:
+    source_id = _norm_text(record.get('source_id'))
+    if source_id:
+        return source_id.lower()
+
+    arxiv_id = _norm_text(record.get('arxiv_id'))
+    if arxiv_id:
+        return f'arxiv:{arxiv_id.lower()}'
+
+    pmid = _norm_text(record.get('pmid') or record.get('pubmed_id'))
+    if pmid:
+        pmid = re.sub(r'\D+', '', pmid)
+        if pmid:
+            return f'pmid:{pmid}'
+
+    openalex_id = _norm_text(record.get('openalex_id'))
+    if openalex_id:
+        openalex_key = re.sub(r'^https?://openalex\.org/', '', openalex_id, flags=re.IGNORECASE)
+        return f'openalex:{openalex_key.lower()}'
+
+    return ''
+
+
+def _make_uid(doi: Any, title: Any, authors: Any, year: Any, source_uid: Any = '') -> str:
     normalized_doi = _norm_doi(doi)
     if normalized_doi:
         return f'doi:{normalized_doi}'
+    normalized_source_uid = _norm_text(source_uid).lower()
+    if normalized_source_uid:
+        return normalized_source_uid
     key = '|'.join([
         _norm_text(title).lower(),
         _norm_text(authors).lower(),
@@ -127,6 +155,26 @@ def ensure_dataframe_schema(df: pd.DataFrame) -> pd.DataFrame:
     normalized = normalized.fillna('')
     ordered = SCHEMA_COLUMNS + [col for col in normalized.columns if col not in SCHEMA_COLUMNS]
     return normalized[ordered]
+
+
+def summarize_field_completeness(
+    df: pd.DataFrame,
+    fields: Sequence[str] = DEFAULT_COMPLETENESS_FIELDS,
+) -> Dict[str, Dict[str, float]]:
+    df = ensure_dataframe_schema(df)
+    total = len(df)
+    summary: Dict[str, Dict[str, float]] = {}
+    for field in fields:
+        if field not in df.columns:
+            present = 0
+        else:
+            present = int(df[field].astype(str).str.strip().ne('').sum())
+        summary[field] = {
+            'present': present,
+            'total': total,
+            'rate': round((present / total), 4) if total else 0.0,
+        }
+    return summary
 
 
 def load_master_dataframe(master_csv_path: str) -> pd.DataFrame:
@@ -167,7 +215,8 @@ def normalize_record(record: Dict[str, Any], base_url: str, crawled_at_iso: str,
     pdf_url = record.get('pdf_url') or record.get('fulltext_url') or record.get('pdf') or ''
     url = record.get('url') or record.get('source_url') or abstract_url or ''
 
-    uid = _make_uid(doi, title, authors, year or date)
+    source_uid = _norm_source_uid(record)
+    uid = _make_uid(doi, title, authors, year or date, source_uid=source_uid)
 
     excluded_fields = {
         'title', 'paper_title', 'quote_text',

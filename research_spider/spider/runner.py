@@ -8,7 +8,12 @@ import requests
 from bs4 import BeautifulSoup
 
 from research_spider.spider import fetcher, parser, utils
-from research_spider.storage.schema import SCHEMA_COLUMNS, normalize_record, prepare_incremental_outputs
+from research_spider.storage.schema import (
+    SCHEMA_COLUMNS,
+    normalize_record,
+    prepare_incremental_outputs,
+    summarize_field_completeness,
+)
 
 
 os.makedirs("data", exist_ok=True)
@@ -110,6 +115,7 @@ def crawl_site(base_url, query: str = ""):
     crawled_at_iso = datetime.now(timezone.utc).isoformat()
     normalized_rows = [normalize_record(r, base_url=base_url, crawled_at_iso=crawled_at_iso, query=query) for r in raw_data]
     df_new = pd.DataFrame(normalized_rows, columns=SCHEMA_COLUMNS).drop_duplicates(subset=["uid"])
+    completeness = summarize_field_completeness(df_new)
 
     domain = urlparse(base_url).netloc.replace(".", "_")
     date_str = utils.get_timestamp(date_only=True)
@@ -129,6 +135,9 @@ def crawl_site(base_url, query: str = ""):
     print(f"   - Updated rows today: {stats['updated']}")
     print(f"   - Delta rows saved: {len(df_delta)} (saved to {delta_path})")
     print(f"   - Master total unique rows: {len(df_master)} (saved to {master_path})")
+    print("   - Field completeness:")
+    for field, stats in completeness.items():
+        print(f"     - {field}: {stats['present']}/{stats['total']} ({stats['rate']:.0%})")
 
     # Run visualization on the current delta file to focus on newly changed records.
     try:
