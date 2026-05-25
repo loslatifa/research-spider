@@ -29,6 +29,13 @@ from research_spider.storage.schema import (
 
 os.makedirs("data", exist_ok=True)
 
+JSON_PARSERS = {
+    "parse_openalex_json",
+    "parse_crossref_json",
+    "parse_europe_pmc_json",
+    "parse_semantic_scholar_json",
+}
+
 def slugify(s: str) -> str:
     s = s.strip().lower()
     s = re.sub(r"\s+", "_", s)
@@ -81,7 +88,7 @@ def main():
                 print(f"❌ 未找到解析函数: {parser_name}")
                 break
 
-            if parser_name == "parse_openalex_json":
+            if parser_name in JSON_PARSERS:
                 response = requests.get(url, timeout=20)
                 if response.status_code != 200:
                     print(f"⚠️ 跳过 {url}，请求失败，状态码: {response.status_code}")
@@ -90,8 +97,11 @@ def main():
                     json_data = response.json()
                     page_data = parse_function(json_data, url=url)
                     next_cursor = json_data.get("meta", {}).get("next_cursor")
-                    openalex_has_next = bool(next_cursor)
-                    cursor = next_cursor or cursor
+                    if parser_name == "parse_openalex_json":
+                        openalex_has_next = bool(next_cursor)
+                        cursor = next_cursor or cursor
+                    else:
+                        openalex_has_next = False
             else:
                 html = fetcher.fetch_url(url)
                 if html is None:
@@ -113,6 +123,9 @@ def main():
 
             if empty_pages >= max_empty_pages:
                 print(f"✅ 连续 {max_empty_pages} 页无数据，停止 {site_name} 抓取。")
+                break
+            if parser_name == "parse_semantic_scholar_json":
+                print(f"✅ {site_name} single-page API crawl completed.")
                 break
             if parser_name == "parse_openalex_json" and not openalex_has_next:
                 print(f"✅ {site_name} 未返回下一页 cursor，停止抓取。")

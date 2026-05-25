@@ -1,4 +1,4 @@
-# parser.py - parsers for quotes, arXiv, PubMed, DOAJ, IEEE, and OpenAlex.
+# parser.py - parsers for quotes, arXiv, PubMed, DOAJ, IEEE, and JSON paper APIs.
 import re
 from urllib.parse import urljoin, urlparse
 
@@ -161,4 +161,97 @@ def parse_openalex_json(json_data, url=None):
         }
         records.append(record)
 
+    return records
+
+
+def parse_crossref_json(json_data, url=None):
+    records = []
+    for item in json_data.get('message', {}).get('items', []):
+        title = ' '.join(item.get('title') or [])
+        abstract = item.get('abstract', '')
+        authors = ', '.join(
+            ' '.join(part for part in [author.get('given', ''), author.get('family', '')] if part).strip()
+            for author in item.get('author', [])
+        )
+        published = item.get('published-print') or item.get('published-online') or item.get('created') or {}
+        date_parts = published.get('date-parts') or []
+        date_values = date_parts[0] if date_parts else []
+        year = str(date_values[0]) if date_values else ''
+        date = '-'.join(str(part) for part in date_values) if date_values else ''
+        venue = ', '.join(item.get('container-title') or [])
+        doi = item.get('DOI', '')
+        record = {
+            'source_url': url if url else '',
+            'title': title,
+            'authors': authors,
+            'venue': venue,
+            'publication_year': year,
+            'publication_date': date,
+            'doi': doi,
+            'abstract': abstract,
+            'url': item.get('URL', ''),
+            'crossref_type': item.get('type', ''),
+            'citation_count': item.get('is-referenced-by-count', 0),
+        }
+        records.append(record)
+    return records
+
+
+def parse_europe_pmc_json(json_data, url=None):
+    records = []
+    for item in json_data.get('resultList', {}).get('result', []):
+        doi = item.get('doi', '')
+        pmid = item.get('pmid', '')
+        pmcid = item.get('pmcid', '')
+        source_id = ''
+        if pmid:
+            source_id = f'pmid:{pmid}'
+        elif pmcid:
+            source_id = f'europepmc:{pmcid.lower()}'
+        elif item.get('id'):
+            source_id = f'europepmc:{item.get("id", "").lower()}'
+        record = {
+            'source_url': url if url else '',
+            'title': item.get('title', ''),
+            'authors': item.get('authorString', ''),
+            'venue': item.get('journalTitle', ''),
+            'publication_year': item.get('pubYear', ''),
+            'publication_date': item.get('firstPublicationDate') or item.get('pubYear', ''),
+            'doi': doi,
+            'pmid': pmid,
+            'source_id': source_id,
+            'abstract': item.get('abstractText', ''),
+            'keywords': item.get('keywordList', {}).get('keyword', ''),
+            'url': item.get('fullTextUrlList', {}).get('fullTextUrl', [{}])[0].get('url', '') if item.get('fullTextUrlList') else '',
+            'europe_pmc_id': item.get('id', ''),
+        }
+        records.append(record)
+    return records
+
+
+def parse_semantic_scholar_json(json_data, url=None):
+    records = []
+    for item in json_data.get('data', []):
+        external_ids = item.get('externalIds') or {}
+        authors = ', '.join(author.get('name', '') for author in item.get('authors', []))
+        open_access_pdf = item.get('openAccessPdf') or {}
+        semantic_scholar_id = item.get('paperId', '')
+        record = {
+            'source_url': url if url else '',
+            'title': item.get('title', ''),
+            'authors': authors,
+            'venue': item.get('venue', ''),
+            'publication_year': item.get('year', ''),
+            'publication_date': item.get('publicationDate', ''),
+            'doi': external_ids.get('DOI', ''),
+            'pmid': external_ids.get('PubMed', ''),
+            'arxiv_id': external_ids.get('ArXiv', ''),
+            'source_id': f'semanticscholar:{semantic_scholar_id.lower()}' if semantic_scholar_id else '',
+            'abstract': item.get('abstract', ''),
+            'abstract_url': item.get('url', ''),
+            'pdf_url': open_access_pdf.get('url', ''),
+            'url': item.get('url', ''),
+            'semantic_scholar_id': semantic_scholar_id,
+        }
+        records.append(record)
     return records

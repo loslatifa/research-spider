@@ -4,3 +4,6 @@ pubmed,https://pubmed.ncbi.nlm.nih.gov/?term=machine+learning,parse_pubmed_page,
 doaj,https://doaj.org/search/articles?ref=homepage&q=artificial+intelligence,parse_doaj_page,1
 ieee,https://ieeexplore.ieee.org/search/searchresult.jsp?queryText=deep%20learning,parse_ieee_page,1
 openalex,https://api.openalex.org/works?filter=title.search:machine%20learning,parse_openalex_json,1
+crossref,https://api.crossref.org/works?query.title=machine%20learning&rows=50,parse_crossref_json,1
+europepmc,https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=machine%20learning&format=json&pageSize=50,parse_europe_pmc_json,1
+semantic_scholar,https://api.semanticscholar.org/graph/v1/paper/search?query=machine%20learning&limit=50&fields=title%2Cauthors%2Cyear%2Cabstract%2Curl%2Cvenue%2CpublicationDate%2CexternalIds%2CopenAccessPdf,parse_semantic_scholar_json,1

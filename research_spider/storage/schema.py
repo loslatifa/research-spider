@@ -122,6 +122,14 @@ def _norm_source_uid(record: Dict[str, Any]) -> str:
         openalex_key = re.sub(r'^https?://openalex\.org/', '', openalex_id, flags=re.IGNORECASE)
         return f'openalex:{openalex_key.lower()}'
 
+    semantic_scholar_id = _norm_text(record.get('semantic_scholar_id'))
+    if semantic_scholar_id:
+        return f'semanticscholar:{semantic_scholar_id.lower()}'
+
+    europe_pmc_id = _norm_text(record.get('europe_pmc_id'))
+    if europe_pmc_id:
+        return f'europepmc:{europe_pmc_id.lower()}'
+
     return ''
 
 
@@ -229,6 +237,8 @@ def normalize_record(record: Dict[str, Any], base_url: str, crawled_at_iso: str,
         'keywords', 'tags', 'concepts',
         'abstract_url', 'abstract_link', 'pdf_url', 'fulltext_url', 'pdf',
         'url', 'source_url',
+        'source_id', 'arxiv_id', 'pmid', 'pubmed_id', 'openalex_id',
+        'semantic_scholar_id', 'europe_pmc_id',
     }
     extra = {key: value for key, value in record.items() if key not in excluded_fields}
 

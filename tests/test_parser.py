@@ -64,3 +64,80 @@ def test_parse_openalex_json_extracts_openalex_id():
     assert len(records) == 1
     assert records[0]['openalex_id'] == 'https://openalex.org/W123'
     assert records[0]['url'] == 'https://openalex.org/W123'
+
+
+def test_parse_crossref_json_extracts_structured_fields():
+    payload = {
+        'message': {
+            'items': [
+                {
+                    'title': ['Crossref Paper'],
+                    'author': [{'given': 'Alice', 'family': 'Smith'}],
+                    'container-title': ['Journal of Tests'],
+                    'published-online': {'date-parts': [[2026, 3, 1]]},
+                    'DOI': '10.1000/crossref',
+                    'URL': 'https://doi.org/10.1000/crossref',
+                    'is-referenced-by-count': 7,
+                }
+            ]
+        }
+    }
+
+    records = parser.parse_crossref_json(payload, url='https://api.crossref.org/works')
+
+    assert len(records) == 1
+    assert records[0]['title'] == 'Crossref Paper'
+    assert records[0]['authors'] == 'Alice Smith'
+    assert records[0]['venue'] == 'Journal of Tests'
+    assert records[0]['doi'] == '10.1000/crossref'
+    assert records[0]['publication_year'] == '2026'
+
+
+def test_parse_europe_pmc_json_extracts_identifiers():
+    payload = {
+        'resultList': {
+            'result': [
+                {
+                    'id': 'MED123',
+                    'pmid': '12345',
+                    'title': 'Europe PMC Paper',
+                    'authorString': 'Alice et al.',
+                    'journalTitle': 'Medical Tests',
+                    'pubYear': '2026',
+                    'abstractText': 'Clinical abstract.',
+                }
+            ]
+        }
+    }
+
+    records = parser.parse_europe_pmc_json(payload, url='https://www.ebi.ac.uk/europepmc/webservices/rest/search')
+
+    assert len(records) == 1
+    assert records[0]['title'] == 'Europe PMC Paper'
+    assert records[0]['pmid'] == '12345'
+    assert records[0]['source_id'] == 'pmid:12345'
+
+
+def test_parse_semantic_scholar_json_extracts_external_ids():
+    payload = {
+        'data': [
+            {
+                'paperId': 'abc123',
+                'title': 'Semantic Scholar Paper',
+                'authors': [{'name': 'Alice'}, {'name': 'Bob'}],
+                'year': 2026,
+                'abstract': 'A useful abstract.',
+                'url': 'https://www.semanticscholar.org/paper/abc123',
+                'externalIds': {'DOI': '10.1000/semantic', 'ArXiv': '2401.1'},
+                'openAccessPdf': {'url': 'https://example.com/paper.pdf'},
+            }
+        ]
+    }
+
+    records = parser.parse_semantic_scholar_json(payload, url='https://api.semanticscholar.org/graph/v1/paper/search')
+
+    assert len(records) == 1
+    assert records[0]['semantic_scholar_id'] == 'abc123'
+    assert records[0]['authors'] == 'Alice, Bob'
+    assert records[0]['doi'] == '10.1000/semantic'
+    assert records[0]['arxiv_id'] == '2401.1'

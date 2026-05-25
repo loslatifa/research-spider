@@ -18,6 +18,13 @@ from research_spider.storage.schema import (
 
 os.makedirs("data", exist_ok=True)
 
+JSON_API_DOMAINS = {
+    "api.openalex.org",
+    "api.crossref.org",
+    "www.ebi.ac.uk",
+    "api.semanticscholar.org",
+}
+
 def select_parser(url):
     """Select the parser function that matches the URL domain."""
     domain = urlparse(url).netloc
@@ -33,9 +40,19 @@ def select_parser(url):
         return parser.parse_ieee_page
     elif "api.openalex.org" in domain:
         return parser.parse_openalex_json
+    elif "api.crossref.org" in domain:
+        return parser.parse_crossref_json
+    elif "www.ebi.ac.uk" in domain:
+        return parser.parse_europe_pmc_json
+    elif "api.semanticscholar.org" in domain:
+        return parser.parse_semantic_scholar_json
     else:
         print(f"❌ No parser available for {domain}")
         return None
+
+
+def _is_json_api_url(url: str) -> bool:
+    return urlparse(url).netloc in JSON_API_DOMAINS
 
 def crawl_site(base_url, query: str = ""):
     """
@@ -58,21 +75,21 @@ def crawl_site(base_url, query: str = ""):
 
         print(f"🌐 Crawling: {url}")
 
-        if "api.openalex.org" in urlparse(url).netloc:
-            response = requests.get(url)
+        if _is_json_api_url(url):
+            response = requests.get(url, timeout=20)
             if response.status_code != 200:
-                print(f"❌ Failed to fetch OpenAlex API, status code: {response.status_code}")
+                print(f"❌ Failed to fetch JSON API, status code: {response.status_code}")
                 break
             json_data = response.json()
             page_data = parse_function(json_data, url=url)
             if page_data:
                 raw_data.extend(page_data)
-                print(f"✅ Extracted {len(page_data)} items from OpenAlex API")
+                print(f"✅ Extracted {len(page_data)} items from JSON API")
             else:
-                print("⚠️ No data extracted from OpenAlex API.")
+                print("⚠️ No data extracted from JSON API.")
 
-            next_cursor = json_data.get("meta", {}).get("next_cursor")
-            if next_cursor:
+            next_cursor = json_data.get("meta", {}).get("next_cursor") if "api.openalex.org" in urlparse(url).netloc else None
+            if next_cursor and "?" in url:
                 next_url = url.split("?")[0] + "?" + "&".join(
                     [kv for kv in url.split("?")[1].split("&") if not kv.startswith("cursor=")]
                 ) + f"&cursor={next_cursor}"

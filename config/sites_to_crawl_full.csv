@@ -3,3 +3,6 @@ arxiv,https://arxiv.org/,https://arxiv.org/search/?query={keyword}&searchtype=al
 pubmed,https://pubmed.ncbi.nlm.nih.gov/,https://pubmed.ncbi.nlm.nih.gov/?term={keyword}&page={page},parse_pubmed_search_page,1
 openalex,https://api.openalex.org/works,https://api.openalex.org/works?filter=title.search:{keyword}&per-page=50&cursor={cursor},parse_openalex_json,1
 ieee,https://ieeexplore.ieee.org/,https://ieeexplore.ieee.org/search/searchresult.jsp?queryText={keyword}&pageNumber={page},parse_ieee_search_page,1
+crossref,https://api.crossref.org/works,https://api.crossref.org/works?query.title={keyword}&rows=50&offset={start},parse_crossref_json,1
+europepmc,https://www.ebi.ac.uk/europepmc/webservices/rest/search,https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={keyword}&format=json&pageSize=50&page={page},parse_europe_pmc_json,1
+semantic_scholar,https://api.semanticscholar.org/graph/v1/paper/search,https://api.semanticscholar.org/graph/v1/paper/search?query={keyword}&limit=50&fields=title%2Cauthors%2Cyear%2Cabstract%2Curl%2Cvenue%2CpublicationDate%2CexternalIds%2CopenAccessPdf,parse_semantic_scholar_json,1
