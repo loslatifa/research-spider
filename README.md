@@ -8,6 +8,7 @@ Research Spider 是一个支持定时定点批量爬取多个科研网站（如 
 - 可配置站点管理 (`config/sites_to_crawl.csv`)
 - 自动定时每日凌晨 3:00 批量抓取 (`scripts/auto_runner.py`)
 - 自动保存 `result/master` CSV 并做增量更新检测
+- 增量结果会报告输入行、去重行、缺 UID 行、new / updated / unchanged 数量
 - 支持共享论文 schema，输出 `abstract` / `keywords` / `record_hash` / `change_type`
 - 支持 SQLite 结构化存储 (`data/research_spider.db`)
 - 支持 AI 论文分析流水线，输出稳定 JSON

@@ -264,7 +264,14 @@ def normalize_record(record: Dict[str, Any], base_url: str, crawled_at_iso: str,
 
 
 def prepare_incremental_outputs(df_new: pd.DataFrame, master_csv_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, int]]:
-    df_new = ensure_dataframe_schema(df_new).drop_duplicates(subset=['uid'], keep='last')
+    df_new = ensure_dataframe_schema(df_new)
+    input_rows = len(df_new)
+    has_uid = df_new['uid'].astype(str).str.strip().ne('') if not df_new.empty else pd.Series(dtype=bool)
+    missing_uid_rows = int((~has_uid).sum()) if not df_new.empty else 0
+    df_new = df_new[has_uid].copy() if not df_new.empty else df_new
+    unique_rows = df_new.drop_duplicates(subset=['uid'], keep='last')
+    duplicate_rows_dropped = len(df_new) - len(unique_rows)
+    df_new = unique_rows
     if not df_new.empty:
         df_new['record_hash'] = df_new.apply(lambda row: row['record_hash'] or _build_record_hash(row.to_dict()), axis=1)
 
@@ -272,12 +279,17 @@ def prepare_incremental_outputs(df_new: pd.DataFrame, master_csv_path: str) -> T
     master_hash_by_uid = dict(zip(df_master['uid'], df_master['record_hash'])) if not df_master.empty else {}
 
     delta_rows = []
-    stats = {'new': 0, 'updated': 0, 'unchanged': 0}
+    stats = {
+        'input_rows': input_rows,
+        'new': 0,
+        'updated': 0,
+        'unchanged': 0,
+        'duplicate_rows_dropped': duplicate_rows_dropped,
+        'missing_uid_rows': missing_uid_rows,
+    }
     for _, row in df_new.iterrows():
         row_dict = row.to_dict()
         uid = row_dict.get('uid', '')
-        if not uid:
-            continue
         existing_hash = master_hash_by_uid.get(uid)
         if not existing_hash:
             row_dict['change_type'] = 'new'

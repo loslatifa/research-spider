@@ -178,7 +178,7 @@ def crawl_site(
     # Normalize to the shared schema and compute incremental outputs.
     crawled_at_iso = datetime.now(timezone.utc).isoformat()
     normalized_rows = [normalize_record(r, base_url=base_url, crawled_at_iso=crawled_at_iso, query=query) for r in raw_data]
-    df_new = pd.DataFrame(normalized_rows, columns=SCHEMA_COLUMNS).drop_duplicates(subset=["uid"])
+    df_new = pd.DataFrame(normalized_rows, columns=SCHEMA_COLUMNS)
     completeness = summarize_field_completeness(df_new)
 
     domain = urlparse(base_url).netloc.replace(".", "_")
@@ -195,8 +195,12 @@ def crawl_site(
     df_master.to_csv(master_path, index=False)
 
     print(f"\n✅ Crawl completed.")
+    print(f"   - Input rows: {stats['input_rows']}")
     print(f"   - New rows today: {stats['new']}")
     print(f"   - Updated rows today: {stats['updated']}")
+    print(f"   - Unchanged rows today: {stats['unchanged']}")
+    print(f"   - Duplicate rows dropped: {stats['duplicate_rows_dropped']}")
+    print(f"   - Missing UID rows skipped: {stats['missing_uid_rows']}")
     print(f"   - Delta rows saved: {len(df_delta)} (saved to {delta_path})")
     print(f"   - Master total unique rows: {len(df_master)} (saved to {master_path})")
     print("   - Field completeness:")

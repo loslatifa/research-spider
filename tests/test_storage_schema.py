@@ -94,8 +94,42 @@ def test_prepare_incremental_outputs_ignores_runtime_only_hash_changes(tmp_path)
     )
 
     assert record_v1['record_hash'] == record_v2['record_hash']
-    assert stats == {'new': 0, 'updated': 0, 'unchanged': 1}
+    assert stats['new'] == 0
+    assert stats['updated'] == 0
+    assert stats['unchanged'] == 1
+    assert stats['duplicate_rows_dropped'] == 0
+    assert stats['missing_uid_rows'] == 0
     assert df_delta.empty
+    assert len(df_master) == 1
+
+
+def test_prepare_incremental_outputs_reports_duplicates_and_missing_uids(tmp_path):
+    master_path = tmp_path / 'master.csv'
+    duplicate = normalize_record(
+        {
+            'title': 'Paper A',
+            'authors': 'Alice',
+            'abstract': 'stable abstract',
+            'doi': '10.1000/test',
+            'url': 'https://example.com/a'
+        },
+        base_url='https://example.com',
+        crawled_at_iso='2026-03-15T00:00:00+00:00',
+    )
+    missing_uid = duplicate.copy()
+    missing_uid['uid'] = ''
+    missing_uid['doi'] = ''
+
+    df_delta, df_master, stats = prepare_incremental_outputs(
+        pd.DataFrame([duplicate, duplicate, missing_uid], columns=SCHEMA_COLUMNS),
+        str(master_path),
+    )
+
+    assert stats['input_rows'] == 3
+    assert stats['duplicate_rows_dropped'] == 1
+    assert stats['missing_uid_rows'] == 1
+    assert stats['new'] == 1
+    assert len(df_delta) == 1
     assert len(df_master) == 1
 
 
