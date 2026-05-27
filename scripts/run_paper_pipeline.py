@@ -42,7 +42,8 @@ def main() -> None:
     results = process_delta_files(csv_paths, config_path=args.config, preferences_path=args.preferences)
     for item in results:
         print(
-            f"✅ Processed {item['csv_path']} imported={item['imported']} analyzed={item['analyzed']} notified={item['notified']}"
+            f"✅ Processed {item['csv_path']} run_id={item.get('run_id', '')} "
+            f"imported={item['imported']} analyzed={item['analyzed']} notified={item['notified']}"
         )
         for name, path in item.get('digest_paths', {}).items():
             print(f'   - {name}: {path}')

@@ -22,9 +22,12 @@ def _load_records(csv_path: str) -> List[Dict[str, str]]:
 def process_delta_file(csv_path: str, config_path: str = 'config/pipeline_config.json', preferences_path: str = 'config/user_preferences.json') -> Dict:
     config = load_pipeline_config(config_path=config_path, preferences_path=preferences_path)
     repository = ResearchRepository(config['db_path'])
+    run_id = repository.start_run(csv_path)
     records = _load_records(csv_path)
     if not records:
+        repository.finish_run(run_id, status='completed')
         return {
+            'run_id': run_id,
             'csv_path': csv_path,
             'imported': 0,
             'analyzed': 0,
@@ -34,97 +37,125 @@ def process_delta_file(csv_path: str, config_path: str = 'config/pipeline_config
             'digest_paths': {},
         }
 
-    events = repository.upsert_papers(records)
-    event_map = {event['uid']: event for event in events}
     analyzed = 0
     reused_analysis = 0
     skipped_analysis = 0
-    if config['analysis'].get('enabled', True):
-        pipeline = PaperAnalysisPipeline(
-            max_retries=int(config['analysis'].get('max_retries', 3)),
-            retry_backoff_seconds=float(config['analysis'].get('retry_backoff_seconds', 2)),
-            provider=str(config['analysis'].get('provider', '')),
-            api_key=str(config['analysis'].get('api_key', '')),
-            base_url=str(config['analysis'].get('base_url', '')),
-            model=str(config['analysis'].get('model', '')),
-            timeout=int(config['analysis'].get('timeout_seconds', 0) or 0),
-        )
-        pending_records = repository.get_records_needing_analysis(
-            limit=int(config['analysis'].get('batch_limit', 50)),
-            uids=event_map.keys(),
-        )
-        if config['analysis'].get('prefilter_enabled', True):
-            min_prefilter_score = int(config['analysis'].get('prefilter_min_score', 1))
-            filtered_records = []
+    digest_paths = {}
+    notified = 0
+    try:
+        events = repository.upsert_papers(records)
+        event_map = {event['uid']: event for event in events}
+        if config['analysis'].get('enabled', True):
+            pipeline = PaperAnalysisPipeline(
+                max_retries=int(config['analysis'].get('max_retries', 3)),
+                retry_backoff_seconds=float(config['analysis'].get('retry_backoff_seconds', 2)),
+                provider=str(config['analysis'].get('provider', '')),
+                api_key=str(config['analysis'].get('api_key', '')),
+                base_url=str(config['analysis'].get('base_url', '')),
+                model=str(config['analysis'].get('model', '')),
+                timeout=int(config['analysis'].get('timeout_seconds', 0) or 0),
+            )
+            pending_records = repository.get_records_needing_analysis(
+                limit=int(config['analysis'].get('batch_limit', 50)),
+                uids=event_map.keys(),
+            )
+            if config['analysis'].get('prefilter_enabled', True):
+                min_prefilter_score = int(config['analysis'].get('prefilter_min_score', 1))
+                filtered_records = []
+                for record in pending_records:
+                    preference_match = estimate_preference_match(record, config['preferences'])
+                    if preference_match['score'] >= min_prefilter_score:
+                        filtered_records.append(record)
+                    else:
+                        skipped_analysis += 1
+                pending_records = filtered_records
             for record in pending_records:
-                preference_match = estimate_preference_match(record, config['preferences'])
-                if preference_match['score'] >= min_prefilter_score:
-                    filtered_records.append(record)
-                else:
-                    skipped_analysis += 1
-            pending_records = filtered_records
-        for record in pending_records:
-            cached = repository.get_latest_analysis_for_record_hash(record.get('record_hash', ''))
-            if cached:
+                cached = repository.get_latest_analysis_for_record_hash(record.get('record_hash', ''))
+                if cached:
+                    repository.save_analysis(
+                        uid=record['uid'],
+                        record_hash=record['record_hash'],
+                        analysis=cached['analysis'],
+                        model_name=cached['model_name'] or pipeline.model_name,
+                        prompt_version=cached['prompt_version'] or pipeline.prompt_version,
+                        failure_reason=cached['failure_reason'],
+                    )
+                    reused_analysis += 1
+                    continue
+
+                analysis, failure_reason = pipeline.analyze(record)
                 repository.save_analysis(
                     uid=record['uid'],
                     record_hash=record['record_hash'],
-                    analysis=cached['analysis'],
-                    model_name=cached['model_name'] or pipeline.model_name,
-                    prompt_version=cached['prompt_version'] or pipeline.prompt_version,
-                    failure_reason=cached['failure_reason'],
+                    analysis=analysis,
+                    model_name=pipeline.model_name,
+                    prompt_version=pipeline.prompt_version,
+                    failure_reason=failure_reason,
                 )
-                reused_analysis += 1
-                continue
+                analyzed += 1
 
-            analysis, failure_reason = pipeline.analyze(record)
-            repository.save_analysis(
-                uid=record['uid'],
-                record_hash=record['record_hash'],
-                analysis=analysis,
-                model_name=pipeline.model_name,
-                prompt_version=pipeline.prompt_version,
-                failure_reason=failure_reason,
-            )
-            analyzed += 1
-
-    event_uids = [event['uid'] for event in events if event.get('change_type') in {'new', 'updated'}]
-    event_records = []
-    for record in records:
-        uid = record.get('uid')
-        if uid in event_uids:
-            merged_record = record.copy()
-            merged_record.update(event_map.get(uid, {}))
-            event_records.append(merged_record)
-    analyses = repository.get_analysis_for_uids(event_uids)
-    recent_notifications = repository.get_recent_notifications(hours=int(config['recommendation'].get('cooldown_hours', 24)))
-    recommendations = build_recommendations(
-        records=event_records,
-        analyses=analyses,
-        preferences=config['preferences'],
-        recent_notifications=recent_notifications,
-        min_priority_score=int(config['recommendation'].get('min_priority_score', 60)),
-        per_topic_limit=int(config['recommendation'].get('per_topic_limit', 2)),
-    )
-    recommendations = recommendations[: int(config['recommendation'].get('max_batch_size', 10))]
-
-    digest_paths = {}
-    if recommendations and config['notification'].get('enabled', True):
-        dispatcher = NotificationDispatcher(output_dir=config['notification'].get('output_dir', 'data/notifications'))
-        digest_paths = dispatcher.dispatch(recommendations, channels=config['notification'].get('channels', ['console']))
-        repository.save_notifications(
-            recommendations,
-            channel=','.join(config['notification'].get('channels', ['console'])),
-            digest_path=digest_paths.get('markdown') or digest_paths.get('json') or '',
+        event_uids = [event['uid'] for event in events if event.get('change_type') in {'new', 'updated'}]
+        event_records = []
+        for record in records:
+            uid = record.get('uid')
+            if uid in event_uids:
+                merged_record = record.copy()
+                merged_record.update(event_map.get(uid, {}))
+                event_records.append(merged_record)
+        analyses = repository.get_analysis_for_uids(event_uids)
+        recent_notifications = repository.get_recent_notifications(hours=int(config['recommendation'].get('cooldown_hours', 24)))
+        recommendations = build_recommendations(
+            records=event_records,
+            analyses=analyses,
+            preferences=config['preferences'],
+            recent_notifications=recent_notifications,
+            min_priority_score=int(config['recommendation'].get('min_priority_score', 60)),
+            per_topic_limit=int(config['recommendation'].get('per_topic_limit', 2)),
         )
+        recommendations = recommendations[: int(config['recommendation'].get('max_batch_size', 10))]
+
+        if recommendations and config['notification'].get('enabled', True):
+            dispatcher = NotificationDispatcher(output_dir=config['notification'].get('output_dir', 'data/notifications'))
+            digest_paths = dispatcher.dispatch(recommendations, channels=config['notification'].get('channels', ['console']))
+            notified = len(recommendations)
+            repository.save_notifications(
+                recommendations,
+                channel=','.join(config['notification'].get('channels', ['console'])),
+                digest_path=digest_paths.get('markdown') or digest_paths.get('json') or '',
+            )
+
+        repository.finish_run(
+            run_id,
+            status='completed',
+            imported=len(records),
+            analyzed=analyzed,
+            reused_analysis=reused_analysis,
+            skipped_analysis=skipped_analysis,
+            notified=notified,
+            digest_paths=digest_paths,
+        )
+    except Exception as exc:
+        repository.finish_run(
+            run_id,
+            status='failed',
+            imported=len(records),
+            analyzed=analyzed,
+            reused_analysis=reused_analysis,
+            skipped_analysis=skipped_analysis,
+            notified=0,
+            digest_paths=digest_paths,
+            error_message=str(exc),
+        )
+        raise
 
     return {
+        'run_id': run_id,
         'csv_path': csv_path,
         'imported': len(records),
         'analyzed': analyzed,
         'reused_analysis': reused_analysis,
         'skipped_analysis': skipped_analysis,
-        'notified': len(recommendations),
+        'notified': notified,
         'digest_paths': digest_paths,
     }
 

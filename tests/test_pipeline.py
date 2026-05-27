@@ -5,6 +5,7 @@ import pytest
 
 from research_spider.pipeline.config import load_pipeline_config
 from research_spider.pipeline.orchestrator import process_delta_file
+from research_spider.storage.repository import ResearchRepository
 from research_spider.storage.schema import SCHEMA_COLUMNS, normalize_record
 
 
@@ -75,9 +76,18 @@ def test_process_delta_file_runs_with_fallback_analysis(tmp_path):
     result = process_delta_file(str(csv_path), config_path=str(config_path), preferences_path=str(preferences_path))
 
     assert result['imported'] == 1
+    assert result['run_id']
     assert result['analyzed'] == 1
     assert result['notified'] == 1
     assert 'json' in result['digest_paths']
+
+    latest_run = ResearchRepository(str(db_path)).get_latest_run()
+    assert latest_run['run_id'] == result['run_id']
+    assert latest_run['status'] == 'completed'
+    assert latest_run['imported'] == 1
+    assert latest_run['analyzed'] == 1
+    assert latest_run['notified'] == 1
+    assert 'json' in latest_run['digest_paths']
 
 
 def test_process_delta_file_accepts_qwen_analysis_config_without_api_key(tmp_path):

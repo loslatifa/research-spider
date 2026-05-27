@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Iterable, List, Optional
 
@@ -75,8 +76,97 @@ class ResearchRepository:
                     digest_path TEXT,
                     payload_json TEXT
                 );
+
+                CREATE TABLE IF NOT EXISTS runs (
+                    run_id TEXT PRIMARY KEY,
+                    csv_path TEXT,
+                    status TEXT NOT NULL,
+                    started_at TEXT NOT NULL,
+                    finished_at TEXT,
+                    imported INTEGER DEFAULT 0,
+                    analyzed INTEGER DEFAULT 0,
+                    reused_analysis INTEGER DEFAULT 0,
+                    skipped_analysis INTEGER DEFAULT 0,
+                    notified INTEGER DEFAULT 0,
+                    digest_paths_json TEXT,
+                    error_message TEXT
+                );
                 '''
             )
+
+    def start_run(self, csv_path: str) -> str:
+        run_id = str(uuid.uuid4())
+        started_at = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                '''
+                INSERT INTO runs (run_id, csv_path, status, started_at, digest_paths_json)
+                VALUES (?, ?, ?, ?, ?)
+                ''',
+                (run_id, csv_path, 'running', started_at, '{}'),
+            )
+        return run_id
+
+    def finish_run(
+        self,
+        run_id: str,
+        status: str,
+        imported: int = 0,
+        analyzed: int = 0,
+        reused_analysis: int = 0,
+        skipped_analysis: int = 0,
+        notified: int = 0,
+        digest_paths: Optional[Dict[str, str]] = None,
+        error_message: str = '',
+    ) -> None:
+        finished_at = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                '''
+                UPDATE runs
+                SET status = ?,
+                    finished_at = ?,
+                    imported = ?,
+                    analyzed = ?,
+                    reused_analysis = ?,
+                    skipped_analysis = ?,
+                    notified = ?,
+                    digest_paths_json = ?,
+                    error_message = ?
+                WHERE run_id = ?
+                ''',
+                (
+                    status,
+                    finished_at,
+                    imported,
+                    analyzed,
+                    reused_analysis,
+                    skipped_analysis,
+                    notified,
+                    json.dumps(digest_paths or {}, ensure_ascii=False),
+                    error_message,
+                    run_id,
+                ),
+            )
+
+    def get_latest_run(self) -> Dict:
+        with self._connect() as conn:
+            row = conn.execute(
+                '''
+                SELECT *
+                FROM runs
+                ORDER BY started_at DESC
+                LIMIT 1
+                '''
+            ).fetchone()
+        if not row:
+            return {}
+        result = dict(row)
+        try:
+            result['digest_paths'] = json.loads(result.pop('digest_paths_json') or '{}')
+        except json.JSONDecodeError:
+            result['digest_paths'] = {}
+        return result
 
     def upsert_papers(self, records: Iterable[Dict[str, str]]) -> List[Dict[str, str]]:
         rows = [dict(record) for record in records if record.get('uid')]
