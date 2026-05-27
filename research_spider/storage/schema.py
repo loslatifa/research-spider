@@ -31,7 +31,6 @@ SCHEMA_COLUMNS = [
 DEFAULT_COMPLETENESS_FIELDS = ['title', 'authors', 'url', 'abstract', 'doi']
 
 _HASH_FIELDS = [
-    'uid',
     'title',
     'authors',
     'venue',
@@ -43,8 +42,6 @@ _HASH_FIELDS = [
     'abstract_url',
     'pdf_url',
     'url',
-    'source',
-    'query',
     'extra',
 ]
 
