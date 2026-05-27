@@ -78,8 +78,12 @@ python -m scripts.run_spider
 python -m scripts.run_spider --list
 python -m scripts.run_spider --site arxiv
 python -m scripts.run_spider --site arxiv --site openalex
+python -m scripts.run_spider --site openalex --smoke
+python -m scripts.run_spider --site crossref --max-pages 1 --max-items 10 --no-ai
 python -m scripts.run_spider --url https://api.openalex.org/works?filter=title.search:machine%20learning
 ```
+
+`--smoke` 用于快速验证抓取链路，默认限制为 1 页、10 条记录，并跳过 AI 分析；正式运行时可用 `--max-pages` / `--max-items` 控制 API 翻页规模，用 `--no-ai` 暂时跳过模型分析。
 
 5️⃣ **关键词抓取**：
 ```bash

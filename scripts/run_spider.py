@@ -59,7 +59,31 @@ def _validate_latest_output(url: str) -> None:
         print("⚠️ No output CSV found to validate. Please check crawl logs.")
 
 
-def _crawl_url(url: str, site_name: str = "manual") -> None:
+def _resolve_run_options(args: argparse.Namespace) -> dict:
+    max_pages = args.max_pages
+    max_items = args.max_items
+    run_ai = not args.no_ai
+    run_visualization = not args.no_visualization
+    if args.smoke:
+        max_pages = max_pages or 1
+        max_items = max_items or 10
+        run_ai = False
+    return {
+        "max_pages": max_pages,
+        "max_items": max_items,
+        "run_ai": run_ai,
+        "run_visualization": run_visualization,
+    }
+
+
+def _crawl_url(
+    url: str,
+    site_name: str = "manual",
+    max_pages: int = 0,
+    max_items: int = 0,
+    run_ai: bool = True,
+    run_visualization: bool = True,
+) -> None:
     normalized_url = _normalize_url(url)
     if not normalized_url:
         print(f"❌ Empty URL for site={site_name}, skipping.")
@@ -71,7 +95,13 @@ def _crawl_url(url: str, site_name: str = "manual") -> None:
         print(f"❌ Crawling aborted for {site_name}: robots.txt disallows this URL.")
         return
 
-    runner.crawl_site(normalized_url)
+    runner.crawl_site(
+        normalized_url,
+        max_pages=max_pages,
+        max_items=max_items,
+        run_ai=run_ai,
+        run_visualization=run_visualization,
+    )
     _validate_latest_output(normalized_url)
 
 
@@ -99,17 +129,48 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="List configured sources and exit.",
     )
+    parser.add_argument(
+        "--max-pages",
+        type=int,
+        default=0,
+        help="Maximum pages/API cursor pages to crawl. 0 means unlimited.",
+    )
+    parser.add_argument(
+        "--max-items",
+        type=int,
+        default=0,
+        help="Maximum records to keep from the crawl. 0 means unlimited.",
+    )
+    parser.add_argument(
+        "--no-ai",
+        action="store_true",
+        help="Skip AI analysis and digest notification after writing crawl outputs.",
+    )
+    parser.add_argument(
+        "--no-visualization",
+        action="store_true",
+        help="Skip local visualization generation after writing crawl outputs.",
+    )
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Run a quick smoke test: max 1 page, max 10 items, skip AI.",
+    )
     return parser
 
 
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+    run_options = _resolve_run_options(args)
 
     print("\n🚀 Research Spider Framework: Config-driven crawler")
 
     if args.url:
-        _crawl_url(args.url)
+        _crawl_url(
+            args.url,
+            **run_options,
+        )
         print("\n🎉 Crawling and validation completed. Data ready for analysis.")
         return
 
@@ -129,7 +190,11 @@ def main() -> None:
 
     for site in selected_sites:
         try:
-            _crawl_url(site["url"], site_name=str(site.get("site_name", "unknown")))
+            _crawl_url(
+                site["url"],
+                site_name=str(site.get("site_name", "unknown")),
+                **run_options,
+            )
         except Exception as exc:
             print(f"❌ Error while crawling {site.get('site_name', 'unknown')}: {exc}")
 

@@ -1,5 +1,6 @@
 # runner.py - parser selection, pagination, schema normalization, and pipeline hooks.
 import os
+import time
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
@@ -54,7 +55,29 @@ def select_parser(url):
 def _is_json_api_url(url: str) -> bool:
     return urlparse(url).netloc in JSON_API_DOMAINS
 
-def crawl_site(base_url, query: str = ""):
+
+def _fetch_json_api(url: str, retries: int = 3, timeout: int = 20) -> dict:
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.get(url, timeout=timeout)
+            if response.status_code == 200:
+                return response.json()
+            print(f"⚠️ JSON API status {response.status_code} on {url}, retrying...")
+        except Exception as exc:
+            print(f"⚠️ JSON API exception on {url}: {exc}, retrying...")
+        if attempt < retries:
+            time.sleep(min(2 * attempt, 5))
+    return {}
+
+
+def crawl_site(
+    base_url,
+    query: str = "",
+    max_pages: int = 0,
+    max_items: int = 0,
+    run_ai: bool = True,
+    run_visualization: bool = True,
+):
     """
     Crawl paginated content, normalize records, persist deltas, and run downstream hooks.
     - query: optional search term for later analysis and tracing.
@@ -68,27 +91,43 @@ def crawl_site(base_url, query: str = ""):
     visited = set()
     to_visit = [base_url]
 
+    pages_crawled = 0
     while to_visit:
+        if max_pages and pages_crawled >= max_pages:
+            print(f"✅ Reached max_pages={max_pages}, stopping crawl.")
+            break
+        if max_items and len(raw_data) >= max_items:
+            print(f"✅ Reached max_items={max_items}, stopping crawl.")
+            break
+
         url = to_visit.pop(0)
         if url in visited:
             continue
 
         print(f"🌐 Crawling: {url}")
+        pages_crawled += 1
 
         if _is_json_api_url(url):
-            response = requests.get(url, timeout=20)
-            if response.status_code != 200:
-                print(f"❌ Failed to fetch JSON API, status code: {response.status_code}")
+            json_data = _fetch_json_api(url)
+            if not json_data:
+                print("❌ Failed to fetch JSON API after retries.")
                 break
-            json_data = response.json()
             page_data = parse_function(json_data, url=url)
             if page_data:
                 raw_data.extend(page_data)
+                if max_items and len(raw_data) > max_items:
+                    raw_data = raw_data[:max_items]
                 print(f"✅ Extracted {len(page_data)} items from JSON API")
             else:
                 print("⚠️ No data extracted from JSON API.")
 
             next_cursor = json_data.get("meta", {}).get("next_cursor") if "api.openalex.org" in urlparse(url).netloc else None
+            if max_items and len(raw_data) >= max_items:
+                print(f"✅ Reached max_items={max_items}, stopping.")
+                break
+            if max_pages and pages_crawled >= max_pages:
+                print(f"✅ Reached max_pages={max_pages}, stopping.")
+                break
             if next_cursor and "?" in url:
                 next_url = url.split("?")[0] + "?" + "&".join(
                     [kv for kv in url.split("?")[1].split("&") if not kv.startswith("cursor=")]
@@ -107,12 +146,20 @@ def crawl_site(base_url, query: str = ""):
             page_data = parse_function(html, url=url)
             if page_data:
                 raw_data.extend(page_data)
+                if max_items and len(raw_data) > max_items:
+                    raw_data = raw_data[:max_items]
                 print(f"✅ Extracted {len(page_data)} items from {url}")
             else:
                 print(f"⚠️ No data extracted from {url}")
 
             soup = BeautifulSoup(html, "html.parser")
             next_page = soup.find("li", class_="next")
+            if max_items and len(raw_data) >= max_items:
+                print(f"✅ Reached max_items={max_items}, stopping crawl.")
+                break
+            if max_pages and pages_crawled >= max_pages:
+                print(f"✅ Reached max_pages={max_pages}, stopping crawl.")
+                break
             if next_page and next_page.a and next_page.a.get("href"):
                 next_url = urljoin(url, next_page.a["href"])
                 if next_url not in visited and next_url not in to_visit:
@@ -156,27 +203,33 @@ def crawl_site(base_url, query: str = ""):
     for field, stats in completeness.items():
         print(f"     - {field}: {stats['present']}/{stats['total']} ({stats['rate']:.0%})")
 
-    # Run visualization on the current delta file to focus on newly changed records.
-    try:
-        from scripts import analyze_data
+    if run_visualization:
+        # Run visualization on the current delta file to focus on newly changed records.
+        try:
+            from scripts import analyze_data
 
-        analyze_data.analyze_csv(delta_path)
-        print("✅ Visualization pipeline completed (delta file).")
-    except Exception as e:
-        print(f"⚠️ Visualization pipeline failed: {e}")
+            analyze_data.analyze_csv(delta_path)
+            print("✅ Visualization pipeline completed (delta file).")
+        except Exception as e:
+            print(f"⚠️ Visualization pipeline failed: {e}")
+    else:
+        print("✅ Visualization pipeline skipped.")
 
-    try:
-        from research_spider.pipeline.orchestrator import process_delta_file
+    if run_ai:
+        try:
+            from research_spider.pipeline.orchestrator import process_delta_file
 
-        result = process_delta_file(delta_path)
-        print(
-            f"✅ AI pipeline completed imported={result['imported']} "
-            f"analyzed={result['analyzed']} reused_analysis={result.get('reused_analysis', 0)} "
-            f"skipped_analysis={result.get('skipped_analysis', 0)} "
-            f"notified={result['notified']}"
-        )
-    except Exception as e:
-        print(f"⚠️ AI pipeline failed: {e}")
+            result = process_delta_file(delta_path)
+            print(
+                f"✅ AI pipeline completed imported={result['imported']} "
+                f"analyzed={result['analyzed']} reused_analysis={result.get('reused_analysis', 0)} "
+                f"skipped_analysis={result.get('skipped_analysis', 0)} "
+                f"notified={result['notified']}"
+            )
+        except Exception as e:
+            print(f"⚠️ AI pipeline failed: {e}")
+    else:
+        print("✅ AI pipeline skipped.")
 
 if __name__ == "__main__":
     url = input("Enter the URL to crawl (e.g., https://example.com): ").strip()
