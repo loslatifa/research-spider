@@ -11,7 +11,7 @@ Research Spider 是一个支持定时定点批量爬取多个科研网站（如 
 - 支持共享论文 schema，输出 `abstract` / `keywords` / `record_hash` / `change_type`
 - 支持 SQLite 结构化存储 (`data/research_spider.db`)
 - 支持 AI 论文分析流水线，输出稳定 JSON
-- 支持 AI 分析前的偏好预筛选，减少低相关论文的模型调用
+- 支持 AI 分析前的偏好预筛选与相同记录分析复用，减少低相关和重复模型调用
 - 支持推荐打分、主题节流、重复推送抑制
 - 支持控制台 + Markdown + JSON digest 推送
 - 支持停用词过滤与 TF-IDF 关键词提取

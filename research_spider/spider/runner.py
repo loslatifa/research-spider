@@ -171,7 +171,8 @@ def crawl_site(base_url, query: str = ""):
         result = process_delta_file(delta_path)
         print(
             f"✅ AI pipeline completed imported={result['imported']} "
-            f"analyzed={result['analyzed']} skipped_analysis={result.get('skipped_analysis', 0)} "
+            f"analyzed={result['analyzed']} reused_analysis={result.get('reused_analysis', 0)} "
+            f"skipped_analysis={result.get('skipped_analysis', 0)} "
             f"notified={result['notified']}"
         )
     except Exception as e:

@@ -196,6 +196,33 @@ class ResearchRepository:
                 ),
             )
 
+    def get_latest_analysis_for_record_hash(self, record_hash: str) -> Dict:
+        if not record_hash:
+            return {}
+        with self._connect() as conn:
+            row = conn.execute(
+                '''
+                SELECT analysis_json, model_name, prompt_version, failure_reason
+                FROM analyses
+                WHERE record_hash = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                ''',
+                (record_hash,),
+            ).fetchone()
+        if not row:
+            return {}
+        try:
+            analysis = json.loads(row['analysis_json'])
+        except json.JSONDecodeError:
+            return {}
+        return {
+            'analysis': analysis,
+            'model_name': row['model_name'] or '',
+            'prompt_version': row['prompt_version'] or '',
+            'failure_reason': row['failure_reason'] or '',
+        }
+
     def get_analysis_for_uids(self, uids: Iterable[str]) -> Dict[str, Dict]:
         uid_list = [uid for uid in uids if uid]
         if not uid_list:

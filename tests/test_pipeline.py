@@ -173,3 +173,60 @@ def test_process_delta_file_prefilters_low_relevance_analysis_candidates(tmp_pat
     assert result['imported'] == 2
     assert result['analyzed'] == 1
     assert result['skipped_analysis'] == 1
+
+
+def test_process_delta_file_reuses_analysis_by_record_hash(tmp_path):
+    csv_path = tmp_path / 'delta.csv'
+    db_path = tmp_path / 'research.db'
+    config_path = tmp_path / 'pipeline_config.json'
+    preferences_path = tmp_path / 'user_preferences.json'
+
+    first = normalize_record(
+        {
+            'title': 'Agent Benchmark for Tool Use',
+            'authors': 'Alice',
+            'abstract': 'We introduce a benchmark for agent systems.',
+            'keywords': 'agent, benchmark',
+            'url': 'https://example.com/agent'
+        },
+        base_url='https://example.com',
+        crawled_at_iso='2026-03-14T00:00:00+00:00',
+        query='agent',
+    )
+    first['change_type'] = 'new'
+    pd.DataFrame([first], columns=SCHEMA_COLUMNS).to_csv(csv_path, index=False)
+
+    config_path.write_text(json.dumps({
+        'db_path': str(db_path),
+        'analysis': {
+            'prefilter_enabled': True,
+            'prefilter_min_score': 1,
+            'batch_limit': 10,
+        },
+        'notification': {
+            'enabled': False,
+        },
+        'recommendation': {
+            'min_priority_score': 40,
+            'max_batch_size': 5
+        }
+    }), encoding='utf-8')
+    preferences_path.write_text(json.dumps({
+        'keywords': ['agent', 'benchmark'],
+        'topics': ['智能体']
+    }), encoding='utf-8')
+
+    first_result = process_delta_file(str(csv_path), config_path=str(config_path), preferences_path=str(preferences_path))
+    assert first_result['analyzed'] == 1
+    assert first_result['reused_analysis'] == 0
+
+    second = first.copy()
+    second['uid'] = 'sha1:manually-distinct-uid'
+    second['change_type'] = 'new'
+    pd.DataFrame([second], columns=SCHEMA_COLUMNS).to_csv(csv_path, index=False)
+
+    second_result = process_delta_file(str(csv_path), config_path=str(config_path), preferences_path=str(preferences_path))
+
+    assert second_result['imported'] == 1
+    assert second_result['analyzed'] == 0
+    assert second_result['reused_analysis'] == 1

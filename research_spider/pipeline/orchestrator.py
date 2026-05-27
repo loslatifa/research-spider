@@ -24,11 +24,20 @@ def process_delta_file(csv_path: str, config_path: str = 'config/pipeline_config
     repository = ResearchRepository(config['db_path'])
     records = _load_records(csv_path)
     if not records:
-        return {'csv_path': csv_path, 'imported': 0, 'analyzed': 0, 'skipped_analysis': 0, 'notified': 0, 'digest_paths': {}}
+        return {
+            'csv_path': csv_path,
+            'imported': 0,
+            'analyzed': 0,
+            'reused_analysis': 0,
+            'skipped_analysis': 0,
+            'notified': 0,
+            'digest_paths': {},
+        }
 
     events = repository.upsert_papers(records)
     event_map = {event['uid']: event for event in events}
     analyzed = 0
+    reused_analysis = 0
     skipped_analysis = 0
     if config['analysis'].get('enabled', True):
         pipeline = PaperAnalysisPipeline(
@@ -55,6 +64,19 @@ def process_delta_file(csv_path: str, config_path: str = 'config/pipeline_config
                     skipped_analysis += 1
             pending_records = filtered_records
         for record in pending_records:
+            cached = repository.get_latest_analysis_for_record_hash(record.get('record_hash', ''))
+            if cached:
+                repository.save_analysis(
+                    uid=record['uid'],
+                    record_hash=record['record_hash'],
+                    analysis=cached['analysis'],
+                    model_name=cached['model_name'] or pipeline.model_name,
+                    prompt_version=cached['prompt_version'] or pipeline.prompt_version,
+                    failure_reason=cached['failure_reason'],
+                )
+                reused_analysis += 1
+                continue
+
             analysis, failure_reason = pipeline.analyze(record)
             repository.save_analysis(
                 uid=record['uid'],
@@ -100,6 +122,7 @@ def process_delta_file(csv_path: str, config_path: str = 'config/pipeline_config
         'csv_path': csv_path,
         'imported': len(records),
         'analyzed': analyzed,
+        'reused_analysis': reused_analysis,
         'skipped_analysis': skipped_analysis,
         'notified': len(recommendations),
         'digest_paths': digest_paths,
