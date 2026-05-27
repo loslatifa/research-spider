@@ -77,6 +77,40 @@ def _preference_signals(record: Dict, analysis: Dict, preferences: Dict) -> Dict
     }
 
 
+def estimate_preference_match(record: Dict, preferences: Dict) -> Dict:
+    text = ' '.join([
+        record.get('title', ''),
+        record.get('abstract', ''),
+        record.get('keywords', ''),
+        record.get('query', ''),
+    ]).lower()
+    source_text = ' '.join([
+        record.get('source', ''),
+        record.get('url', ''),
+        record.get('abstract_url', ''),
+        record.get('pdf_url', ''),
+    ]).lower()
+    matched_keywords = [
+        keyword for keyword in preferences.get('keywords', [])
+        if keyword and keyword.lower() in text
+    ]
+    matched_topics = [
+        topic for topic in preferences.get('topics', [])
+        if topic and topic.lower() in text
+    ]
+    matched_sources = [
+        source for source in preferences.get('sources', [])
+        if source and source.lower() in source_text
+    ]
+    score = len(matched_keywords) * 2 + len(matched_topics) * 3 + len(matched_sources)
+    return {
+        'score': score,
+        'matched_keywords': matched_keywords,
+        'matched_topics': matched_topics,
+        'matched_sources': matched_sources,
+    }
+
+
 def _build_recommendation_reasons(
     record: Dict,
     analysis: Dict,

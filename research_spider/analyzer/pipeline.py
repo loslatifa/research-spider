@@ -34,15 +34,19 @@ class PaperAnalysisPipeline:
     def analyze(self, record: Dict[str, str]) -> Tuple[Dict, str]:
         if self.client.available:
             messages = build_messages(record)
-            for attempt in range(1, self.max_retries + 1):
+            last_exception = None
+            max_attempts = max(1, self.max_retries)
+            for attempt in range(1, max_attempts + 1):
                 try:
                     result = self.client.chat_json(messages)
                     return self._normalize_output(record, result), ''
                 except Exception as exc:
-                    if attempt == self.max_retries:
+                    last_exception = exc
+                    if attempt == max_attempts:
                         break
                     time.sleep(self.retry_backoff_seconds * attempt)
-            failure_reason = f'ai_analysis_failed_after_retries:{type(exc).__name__}'
+            failure_type = type(last_exception).__name__ if last_exception else 'unknown'
+            failure_reason = f'ai_analysis_failed_after_retries:{failure_type}'
         else:
             failure_reason = 'ai_client_unavailable'
         return self._fallback_analysis(record), failure_reason

@@ -16,6 +16,8 @@ DEFAULT_CONFIG = {
         'max_retries': 3,
         'retry_backoff_seconds': 2,
         'batch_limit': 50,
+        'prefilter_enabled': True,
+        'prefilter_min_score': 1,
     },
     'recommendation': {
         'min_priority_score': 60,

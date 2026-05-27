@@ -6,7 +6,7 @@ import pandas as pd
 from research_spider.analyzer.pipeline import PaperAnalysisPipeline
 from research_spider.notifier.dispatcher import NotificationDispatcher
 from research_spider.pipeline.config import load_pipeline_config
-from research_spider.recommender.scoring import build_recommendations
+from research_spider.recommender.scoring import build_recommendations, estimate_preference_match
 from research_spider.storage.repository import ResearchRepository
 from research_spider.storage.schema import ensure_dataframe_schema
 
@@ -24,11 +24,12 @@ def process_delta_file(csv_path: str, config_path: str = 'config/pipeline_config
     repository = ResearchRepository(config['db_path'])
     records = _load_records(csv_path)
     if not records:
-        return {'csv_path': csv_path, 'imported': 0, 'analyzed': 0, 'notified': 0, 'digest_paths': {}}
+        return {'csv_path': csv_path, 'imported': 0, 'analyzed': 0, 'skipped_analysis': 0, 'notified': 0, 'digest_paths': {}}
 
     events = repository.upsert_papers(records)
     event_map = {event['uid']: event for event in events}
     analyzed = 0
+    skipped_analysis = 0
     if config['analysis'].get('enabled', True):
         pipeline = PaperAnalysisPipeline(
             max_retries=int(config['analysis'].get('max_retries', 3)),
@@ -43,6 +44,16 @@ def process_delta_file(csv_path: str, config_path: str = 'config/pipeline_config
             limit=int(config['analysis'].get('batch_limit', 50)),
             uids=event_map.keys(),
         )
+        if config['analysis'].get('prefilter_enabled', True):
+            min_prefilter_score = int(config['analysis'].get('prefilter_min_score', 1))
+            filtered_records = []
+            for record in pending_records:
+                preference_match = estimate_preference_match(record, config['preferences'])
+                if preference_match['score'] >= min_prefilter_score:
+                    filtered_records.append(record)
+                else:
+                    skipped_analysis += 1
+            pending_records = filtered_records
         for record in pending_records:
             analysis, failure_reason = pipeline.analyze(record)
             repository.save_analysis(
@@ -89,6 +100,7 @@ def process_delta_file(csv_path: str, config_path: str = 'config/pipeline_config
         'csv_path': csv_path,
         'imported': len(records),
         'analyzed': analyzed,
+        'skipped_analysis': skipped_analysis,
         'notified': len(recommendations),
         'digest_paths': digest_paths,
     }

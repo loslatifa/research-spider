@@ -1,18 +1,29 @@
+import pytest
+
 from research_spider.analyzer.client import OpenAICompatibleClient, load_dotenv
 
 
-def test_client_defaults_to_openai(monkeypatch):
+@pytest.fixture(autouse=True)
+def isolate_dotenv(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
     for key in [
         'AI_PROVIDER',
         'LLM_PROVIDER',
         'OPENAI_API_KEY',
         'OPENAI_BASE_URL',
         'OPENAI_MODEL',
+        'OPENAI_TIMEOUT_SECONDS',
         'QWEN_API_KEY',
         'DASHSCOPE_API_KEY',
+        'QWEN_BASE_URL',
+        'QWEN_MODEL',
+        'QWEN_TIMEOUT_SECONDS',
+        'AI_TIMEOUT_SECONDS',
     ]:
         monkeypatch.delenv(key, raising=False)
 
+
+def test_client_defaults_to_openai(monkeypatch):
     client = OpenAICompatibleClient()
 
     assert client.provider == 'openai'
