@@ -55,7 +55,7 @@ Generated data should stay out of version control:
 
 - `data/*.csv` and local SQLite databases are crawl outputs.
 - `data/notifications/` contains generated digests.
-- `figures/` contains generated charts and word clouds.
+- `figures/` contains generated charts and word clouds; files in this directory are ignored and should not be committed.
 - `logs/` contains runtime logs.
 - Python caches and test caches are ignored.
 
