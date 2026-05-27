@@ -8,6 +8,11 @@ DEFAULT_CONFIG = {
     'db_path': 'data/research_spider.db',
     'analysis': {
         'enabled': True,
+        'provider': 'openai',
+        'model': '',
+        'base_url': '',
+        'api_key': '',
+        'timeout_seconds': 60,
         'max_retries': 3,
         'retry_backoff_seconds': 2,
         'batch_limit': 50,

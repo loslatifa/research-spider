@@ -9,11 +9,26 @@ from research_spider.analyzer.schema import ANALYSIS_SCHEMA_VERSION
 
 
 class PaperAnalysisPipeline:
-    def __init__(self, max_retries: int = 3, retry_backoff_seconds: float = 2.0) -> None:
-        self.client = OpenAICompatibleClient()
+    def __init__(
+        self,
+        max_retries: int = 3,
+        retry_backoff_seconds: float = 2.0,
+        provider: str = '',
+        api_key: str = '',
+        base_url: str = '',
+        model: str = '',
+        timeout: int = 0,
+    ) -> None:
+        self.client = OpenAICompatibleClient(
+            provider=provider or None,
+            api_key=api_key or None,
+            base_url=base_url or None,
+            model=model or None,
+            timeout=timeout or None,
+        )
         self.max_retries = max_retries
         self.retry_backoff_seconds = retry_backoff_seconds
-        self.model_name = self.client.model if self.client.available else 'heuristic-fallback'
+        self.model_name = f'{self.client.provider}:{self.client.model}' if self.client.available else 'heuristic-fallback'
         self.prompt_version = ANALYSIS_SCHEMA_VERSION
 
     def analyze(self, record: Dict[str, str]) -> Tuple[Dict, str]:

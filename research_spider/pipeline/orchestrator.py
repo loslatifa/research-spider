@@ -33,6 +33,11 @@ def process_delta_file(csv_path: str, config_path: str = 'config/pipeline_config
         pipeline = PaperAnalysisPipeline(
             max_retries=int(config['analysis'].get('max_retries', 3)),
             retry_backoff_seconds=float(config['analysis'].get('retry_backoff_seconds', 2)),
+            provider=str(config['analysis'].get('provider', '')),
+            api_key=str(config['analysis'].get('api_key', '')),
+            base_url=str(config['analysis'].get('base_url', '')),
+            model=str(config['analysis'].get('model', '')),
+            timeout=int(config['analysis'].get('timeout_seconds', 0) or 0),
         )
         pending_records = repository.get_records_needing_analysis(
             limit=int(config['analysis'].get('batch_limit', 50)),

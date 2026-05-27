@@ -1,6 +1,7 @@
 import json
 import os
-from typing import Dict, List
+from pathlib import Path
+from typing import Dict, List, Optional
 
 import requests
 
@@ -9,12 +10,70 @@ class AIClientUnavailable(RuntimeError):
     pass
 
 
+def load_dotenv(path: str = '.env') -> None:
+    env_path = Path(path)
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
 class OpenAICompatibleClient:
-    def __init__(self) -> None:
-        self.api_key = os.getenv('OPENAI_API_KEY', '').strip()
-        self.base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1').rstrip('/')
-        self.model = os.getenv('OPENAI_MODEL', 'gpt-4.1-mini').strip()
-        self.timeout = int(os.getenv('OPENAI_TIMEOUT_SECONDS', '60'))
+    PROVIDER_DEFAULTS = {
+        'openai': {
+            'api_key_env': 'OPENAI_API_KEY',
+            'base_url_env': 'OPENAI_BASE_URL',
+            'model_env': 'OPENAI_MODEL',
+            'timeout_env': 'OPENAI_TIMEOUT_SECONDS',
+            'base_url': 'https://api.openai.com/v1',
+            'model': 'gpt-4.1-mini',
+        },
+        'qwen': {
+            'api_key_env': 'QWEN_API_KEY',
+            'fallback_api_key_env': 'DASHSCOPE_API_KEY',
+            'base_url_env': 'QWEN_BASE_URL',
+            'model_env': 'QWEN_MODEL',
+            'timeout_env': 'QWEN_TIMEOUT_SECONDS',
+            'base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+            'model': 'qwen3.5-plus',
+        },
+    }
+
+    def __init__(
+        self,
+        provider: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None,
+        timeout: Optional[int] = None,
+    ) -> None:
+        load_dotenv()
+        self.provider = (provider or os.getenv('AI_PROVIDER') or os.getenv('LLM_PROVIDER') or 'openai').strip().lower()
+        defaults = self.PROVIDER_DEFAULTS.get(self.provider, self.PROVIDER_DEFAULTS['openai'])
+
+        api_key_env = defaults['api_key_env']
+        fallback_api_key_env = defaults.get('fallback_api_key_env', '')
+        env_api_key = os.getenv(api_key_env, '').strip() or (os.getenv(fallback_api_key_env, '').strip() if fallback_api_key_env else '')
+
+        self.api_key = (api_key if api_key is not None else env_api_key).strip()
+        self.base_url = (base_url or os.getenv(defaults['base_url_env'], '') or defaults['base_url']).rstrip('/')
+        self.model = (model or os.getenv(defaults['model_env'], '') or defaults['model']).strip()
+        timeout_value = (
+            os.getenv('AI_TIMEOUT_SECONDS')
+            or os.getenv(defaults.get('timeout_env', ''), '')
+            or os.getenv('OPENAI_TIMEOUT_SECONDS')
+            or '60'
+        )
+        self.timeout = int(timeout_value)
+        if timeout is not None:
+            self.timeout = int(timeout)
 
     @property
     def available(self) -> bool:
@@ -22,7 +81,7 @@ class OpenAICompatibleClient:
 
     def chat_json(self, messages: List[Dict[str, str]]) -> Dict:
         if not self.available:
-            raise AIClientUnavailable('OPENAI_API_KEY is not configured')
+            raise AIClientUnavailable(f'{self.provider} API key is not configured')
 
         endpoint = f'{self.base_url}/chat/completions'
         headers = {

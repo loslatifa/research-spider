@@ -44,13 +44,17 @@ Research Spider 是一个支持定时定点批量爬取多个科研网站（如 
 pip install pandas matplotlib wordcloud scikit-learn requests beautifulsoup4 schedule
 ```
 
-2️⃣ **配置环境变量（可选 AI 模型调用）**：
+2️⃣ **配置 AI 模型（可选）**：
+
+复制模板并填写本地密钥：
 ```bash
-export OPENAI_API_KEY=your_api_key
-export OPENAI_MODEL=gpt-4.1-mini
-export OPENAI_BASE_URL=https://api.openai.com/v1
+cp .env.example .env
 ```
-如果未配置 `OPENAI_API_KEY`，系统会自动回退到本地启发式分析，流程仍可跑通。
+
+默认配置使用 Qwen OpenAI-compatible API，模型为 `qwen3.5-plus`，`.env` 已被 `.gitignore` 忽略，不会提交密钥。
+也兼容 `DASHSCOPE_API_KEY` 作为 Qwen API key。如需切回 OpenAI，可在 `.env` 中改为 `AI_PROVIDER=openai` 并配置 `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_BASE_URL`。
+
+如果未配置对应 provider 的 API key，系统会自动回退到本地启发式分析，流程仍可跑通。
 
 3️⃣ **编辑抓取与推送配置**：
 - `config/sites_to_crawl.csv` / `config/sites_to_crawl_full.csv`

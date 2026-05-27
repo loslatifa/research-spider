@@ -2,6 +2,10 @@
   "db_path": "data/research_spider.db",
   "analysis": {
     "enabled": true,
+    "provider": "qwen",
+    "model": "qwen3.5-plus",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "timeout_seconds": 60,
     "max_retries": 3,
     "retry_backoff_seconds": 2,
     "batch_limit": 50
