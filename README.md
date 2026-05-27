@@ -32,7 +32,7 @@ Research Spider 是一个支持定时定点批量爬取多个科研网站（如 
 - `config/sites_to_crawl.csv` 配置待抓取网站列表
 - `config/pipeline_config.json` AI/推荐/推送配置
 - `config/user_preferences.json` 用户关注主题与关键词
-- `data/` 保存抓取的 CSV
+- `data/` 保存抓取 CSV、本地数据库和 digest，已作为运行产物忽略
 - `figures/` 保存生成的可视化图表和表格，已作为运行产物忽略
 - `logs/` 可选保存抓取日志
 - `scripts/auto_runner.py` 定时批量抓取执行脚本

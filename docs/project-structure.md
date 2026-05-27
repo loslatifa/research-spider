@@ -53,8 +53,8 @@ Static runtime resources belong in `resources/`:
 
 Generated data should stay out of version control:
 
-- `data/*.csv` and local SQLite databases are crawl outputs.
-- `data/notifications/` contains generated digests.
+- `data/*.csv` and local SQLite databases are crawl outputs; they are ignored and should not be committed.
+- `data/notifications/` contains generated digests; generated Markdown and JSON digests are ignored.
 - `figures/` contains generated charts and word clouds; files in this directory are ignored and should not be committed.
 - `logs/` contains runtime logs.
 - Python caches and test caches are ignored.
