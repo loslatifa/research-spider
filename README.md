@@ -14,7 +14,7 @@ Research Spider 是一个支持定时定点批量爬取多个科研网站（如 
 - 支持 AI 论文分析流水线，输出稳定 JSON
 - 支持 AI 分析前的偏好预筛选与相同记录分析复用，减少低相关和重复模型调用
 - 支持推荐打分、主题节流、重复推送抑制
-- 支持控制台 + Markdown + JSON digest 推送
+- 支持控制台 + Markdown + JSON digest 推送，并在 digest 顶部输出推荐总览
 - 支持停用词过滤与 TF-IDF 关键词提取
 - 支持 n-gram (2-3 gram) 复合词频率统计与可视化
 - 可输出词云、柱状图与关键词频率表
@@ -73,6 +73,8 @@ python -m scripts.run_spider
 - CSV 增量更新检测
 - 基础可视化
 - AI 分析与 digest 推送
+
+Markdown/JSON digest 会包含总览信息，包括推荐总数、最高优先级分数、来源分布、变更类型分布和主题分布。
 
 常用命令：
 ```bash

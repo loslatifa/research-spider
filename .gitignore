@@ -21,11 +21,17 @@ logs/spider_log.txt
 
 # Generated crawl data and local databases
 data/*.csv
+data/**/*.csv
 data/*.db
+data/**/*.db
 data/*.sqlite
+data/**/*.sqlite
 data/*.sqlite3
+data/**/*.sqlite3
 data/notifications/*.json
+data/notifications/**/*.json
 data/notifications/*.md
+data/notifications/**/*.md
 
 # Generated visualizations
 figures/
