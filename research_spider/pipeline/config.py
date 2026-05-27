@@ -33,10 +33,42 @@ DEFAULT_CONFIG = {
     'preferences': {
         'topics': [],
         'keywords': [],
+        'strong_keywords': [],
+        'weak_keywords': [],
+        'negative_keywords': [],
+        'excluded_topics': [],
         'sources': [],
+        'preferred_sources': [],
+        'excluded_sources': [],
         'cooldown_hours': 24,
+        'daily_recommendation_limit': None,
     },
 }
+
+PREFERENCE_LIST_FIELDS = {
+    'topics',
+    'keywords',
+    'strong_keywords',
+    'weak_keywords',
+    'negative_keywords',
+    'excluded_topics',
+    'sources',
+    'preferred_sources',
+    'excluded_sources',
+}
+
+
+def validate_preferences(preferences: Dict) -> None:
+    for field in PREFERENCE_LIST_FIELDS:
+        if field in preferences and not isinstance(preferences[field], list):
+            raise ValueError(f'preferences.{field} must be a list')
+
+    for field in ['cooldown_hours', 'daily_recommendation_limit']:
+        value = preferences.get(field)
+        if value is None:
+            continue
+        if not isinstance(value, int) or value < 1:
+            raise ValueError(f'preferences.{field} must be a positive integer')
 
 
 def _deep_merge(base: Dict, override: Dict) -> Dict:
@@ -57,4 +89,5 @@ def load_pipeline_config(config_path: str = 'config/pipeline_config.json', prefe
     if os.path.exists(preferences_path):
         with open(preferences_path, 'r', encoding='utf-8') as handle:
             config['preferences'] = _deep_merge(config['preferences'], json.load(handle))
+    validate_preferences(config['preferences'])
     return config

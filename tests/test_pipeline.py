@@ -3,6 +3,7 @@ import json
 import pandas as pd
 import pytest
 
+from research_spider.pipeline.config import load_pipeline_config
 from research_spider.pipeline.orchestrator import process_delta_file
 from research_spider.storage.schema import SCHEMA_COLUMNS, normalize_record
 
@@ -18,6 +19,18 @@ def isolate_dotenv(monkeypatch, tmp_path):
         'DASHSCOPE_API_KEY',
     ]:
         monkeypatch.delenv(key, raising=False)
+
+
+def test_load_pipeline_config_rejects_invalid_preferences(tmp_path):
+    config_path = tmp_path / 'pipeline_config.json'
+    preferences_path = tmp_path / 'user_preferences.json'
+    config_path.write_text('{}', encoding='utf-8')
+    preferences_path.write_text(json.dumps({
+        'keywords': 'agent',
+    }), encoding='utf-8')
+
+    with pytest.raises(ValueError, match='preferences.keywords must be a list'):
+        load_pipeline_config(config_path=str(config_path), preferences_path=str(preferences_path))
 
 
 def test_process_delta_file_runs_with_fallback_analysis(tmp_path):

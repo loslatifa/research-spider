@@ -1,6 +1,12 @@
 {
   "topics": ["机器学习", "大语言模型", "计算机视觉"],
+  "excluded_topics": ["历史", "法律"],
   "keywords": ["agent", "diffusion", "benchmark"],
+  "weak_keywords": ["survey", "evaluation"],
+  "negative_keywords": ["clinical trial", "finance", "policy"],
   "sources": ["arxiv.org", "api.openalex.org"],
-  "cooldown_hours": 24
+  "preferred_sources": ["api.semanticscholar.org"],
+  "excluded_sources": [],
+  "cooldown_hours": 24,
+  "daily_recommendation_limit": 10
 }

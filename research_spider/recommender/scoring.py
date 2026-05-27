@@ -3,6 +3,27 @@ from datetime import datetime, timezone
 from typing import Dict, Iterable, List
 
 
+def normalize_preferences(preferences: Dict) -> Dict:
+    profile = preferences or {}
+    positive_keywords = list(profile.get('keywords', []))
+    positive_keywords.extend(profile.get('strong_keywords', []))
+    weak_keywords = list(profile.get('weak_keywords', []))
+    preferred_sources = list(profile.get('sources', []))
+    preferred_sources.extend(profile.get('preferred_sources', []))
+
+    return {
+        **profile,
+        'topics': list(profile.get('topics', [])),
+        'keywords': positive_keywords,
+        'weak_keywords': weak_keywords,
+        'negative_keywords': list(profile.get('negative_keywords', [])),
+        'excluded_topics': list(profile.get('excluded_topics', [])),
+        'sources': preferred_sources,
+        'excluded_sources': list(profile.get('excluded_sources', [])),
+        'daily_recommendation_limit': profile.get('daily_recommendation_limit'),
+    }
+
+
 def _safe_json_loads(value: str) -> Dict:
     if not value:
         return {}
@@ -46,6 +67,7 @@ def _freshness_score(record: Dict) -> int:
 
 
 def _preference_signals(record: Dict, analysis: Dict, preferences: Dict) -> Dict:
+    preferences = normalize_preferences(preferences)
     text = ' '.join([
         record.get('title', ''),
         record.get('abstract', ''),
@@ -55,12 +77,17 @@ def _preference_signals(record: Dict, analysis: Dict, preferences: Dict) -> Dict
     ]).lower()
     score = 0
     matched_keywords = []
+    matched_weak_keywords = []
     matched_topics = []
     matched_sources = []
     for keyword in preferences.get('keywords', []):
         if keyword.lower() in text:
             score += 8
             matched_keywords.append(keyword)
+    for keyword in preferences.get('weak_keywords', []):
+        if keyword.lower() in text:
+            score += 3
+            matched_weak_keywords.append(keyword)
     for topic in preferences.get('topics', []):
         if topic.lower() in text:
             score += 10
@@ -72,12 +99,14 @@ def _preference_signals(record: Dict, analysis: Dict, preferences: Dict) -> Dict
     return {
         'score': min(score, 25),
         'matched_keywords': matched_keywords,
+        'matched_weak_keywords': matched_weak_keywords,
         'matched_topics': matched_topics,
         'matched_sources': matched_sources,
     }
 
 
 def estimate_preference_match(record: Dict, preferences: Dict) -> Dict:
+    preferences = normalize_preferences(preferences)
     text = ' '.join([
         record.get('title', ''),
         record.get('abstract', ''),
@@ -94,6 +123,10 @@ def estimate_preference_match(record: Dict, preferences: Dict) -> Dict:
         keyword for keyword in preferences.get('keywords', [])
         if keyword and keyword.lower() in text
     ]
+    matched_weak_keywords = [
+        keyword for keyword in preferences.get('weak_keywords', [])
+        if keyword and keyword.lower() in text
+    ]
     matched_topics = [
         topic for topic in preferences.get('topics', [])
         if topic and topic.lower() in text
@@ -102,12 +135,62 @@ def estimate_preference_match(record: Dict, preferences: Dict) -> Dict:
         source for source in preferences.get('sources', [])
         if source and source.lower() in source_text
     ]
-    score = len(matched_keywords) * 2 + len(matched_topics) * 3 + len(matched_sources)
+    blocked = exclusion_signals(record, {}, preferences)
+    if blocked['is_excluded']:
+        score = 0
+    else:
+        score = (
+            len(matched_keywords) * 2
+            + len(matched_weak_keywords)
+            + len(matched_topics) * 3
+            + len(matched_sources)
+        )
     return {
         'score': score,
         'matched_keywords': matched_keywords,
+        'matched_weak_keywords': matched_weak_keywords,
         'matched_topics': matched_topics,
         'matched_sources': matched_sources,
+        'exclusion': blocked,
+    }
+
+
+def exclusion_signals(record: Dict, analysis: Dict, preferences: Dict) -> Dict:
+    preferences = normalize_preferences(preferences)
+    text = ' '.join([
+        record.get('title', ''),
+        record.get('abstract', ''),
+        record.get('keywords', ''),
+        record.get('query', ''),
+        ' '.join(analysis.get('topic_tags', [])),
+    ]).lower()
+    source_text = ' '.join([
+        record.get('source', ''),
+        record.get('url', ''),
+        record.get('abstract_url', ''),
+        record.get('pdf_url', ''),
+    ]).lower()
+    matched_negative_keywords = [
+        keyword for keyword in preferences.get('negative_keywords', [])
+        if keyword and keyword.lower() in text
+    ]
+    matched_excluded_topics = [
+        topic for topic in preferences.get('excluded_topics', [])
+        if topic and topic.lower() in text
+    ]
+    matched_excluded_sources = [
+        source for source in preferences.get('excluded_sources', [])
+        if source and source.lower() in source_text
+    ]
+    return {
+        'is_excluded': bool(
+            matched_negative_keywords
+            or matched_excluded_topics
+            or matched_excluded_sources
+        ),
+        'negative_keywords': matched_negative_keywords,
+        'excluded_topics': matched_excluded_topics,
+        'excluded_sources': matched_excluded_sources,
     }
 
 
@@ -120,6 +203,8 @@ def _build_recommendation_reasons(
     reasons = []
     if preference_signals['matched_keywords']:
         reasons.append('Matched keywords: ' + ', '.join(preference_signals['matched_keywords']))
+    if preference_signals.get('matched_weak_keywords'):
+        reasons.append('Matched weak keywords: ' + ', '.join(preference_signals['matched_weak_keywords']))
     if preference_signals['matched_topics']:
         reasons.append('Matched topics: ' + ', '.join(preference_signals['matched_topics']))
     if preference_signals['matched_sources']:
@@ -139,6 +224,7 @@ def _build_recommendation_reasons(
 
 
 def score_record(record: Dict, analysis: Dict, preferences: Dict) -> Dict:
+    preferences = normalize_preferences(preferences)
     extra = _safe_json_loads(record.get('extra', ''))
     attention_score = int(analysis.get('attention_score', 0) or 0)
     citation_count = int(extra.get('citation_count', 0) or 0)
@@ -175,6 +261,7 @@ def score_record(record: Dict, analysis: Dict, preferences: Dict) -> Dict:
         'score_components': components,
         'matched_preferences': {
             'keywords': preference_signals['matched_keywords'],
+            'weak_keywords': preference_signals['matched_weak_keywords'],
             'topics': preference_signals['matched_topics'],
             'sources': preference_signals['matched_sources'],
         },
@@ -212,10 +299,13 @@ def build_recommendations(
     min_priority_score: int = 60,
     per_topic_limit: int = 2,
 ) -> List[Dict]:
+    preferences = normalize_preferences(preferences)
     scored = []
     for record in records:
         analysis = analyses.get(record.get('uid', ''))
         if not analysis:
+            continue
+        if exclusion_signals(record, analysis, preferences)['is_excluded']:
             continue
         candidate = score_record(record, analysis, preferences)
         if candidate['priority_score'] < min_priority_score:
@@ -224,4 +314,8 @@ def build_recommendations(
             continue
         scored.append(candidate)
 
-    return apply_push_cooldown(scored, recent_notifications, preferences.get('cooldown_hours', 24), per_topic_limit)
+    filtered = apply_push_cooldown(scored, recent_notifications, preferences.get('cooldown_hours', 24), per_topic_limit)
+    daily_limit = preferences.get('daily_recommendation_limit')
+    if daily_limit is None:
+        return filtered
+    return filtered[: int(daily_limit)]

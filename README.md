@@ -32,7 +32,7 @@ Research Spider 是一个支持定时定点批量爬取多个科研网站（如 
 - `docs/` 项目结构、规划与需求记录
 - `config/sites_to_crawl.csv` 配置待抓取网站列表
 - `config/pipeline_config.json` AI/推荐/推送配置
-- `config/user_preferences.json` 用户关注主题与关键词
+- `config/user_preferences.json` 用户研究偏好、排除规则与每日推荐上限
 - `data/` 保存抓取 CSV、本地数据库和 digest，已作为运行产物忽略
 - `figures/` 保存生成的可视化图表和表格，已作为运行产物忽略
 - `logs/` 可选保存抓取日志
@@ -64,6 +64,7 @@ cp .env.example .env
 - `config/user_preferences.json`
 
 `pipeline_config.json` 中的 `analysis.prefilter_enabled` 会在 AI 分析前按 `user_preferences.json` 的关键词、主题和偏好来源筛选候选论文；`prefilter_min_score` 可调节筛选强度。
+`user_preferences.json` 支持 `keywords` / `strong_keywords` / `weak_keywords`、`topics`、`sources` / `preferred_sources`、`negative_keywords`、`excluded_topics`、`excluded_sources` 和 `daily_recommendation_limit`。负向关键词、排除主题和排除来源会阻止论文进入 AI 预筛选和最终 digest。
 
 4️⃣ **按配置抓取常用源**：
 ```bash
